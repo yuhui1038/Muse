@@ -6,13 +6,13 @@
 
 This repository is the official repository for "Muse: Towards Reproducible Long-Form Song Generation with Fine-Grained Style Control". In this repository, we provide the Muse model, training and inference scripts, pretrained checkpoints, and evaluation pipelines.
 
-## News and Updates
-
-* **2026.01.XX 🔥**: All datasets and models are now open-sourced! 🎶 The complete training dataset (116k songs), model weights, and evaluation pipelines are publicly available.
-
 <p align="center">
   <img src="assets/intro.jpg" width="800"/>
 </p>
+
+## News and Updates
+
+* **2026.01.11 🔥**: All datasets and models are now open-sourced! 🎶 The complete training dataset (116k songs), model weights, and codes are publicly available.
 
 ## Acknowledgments
 
