@@ -517,7 +517,7 @@ def _form_section(section:dict, en:bool) -> str:
     max_index = sims.index(max_sim)
     desc:str = descs[max_index]
     
-    if desc == "音频过短":  # "Audio too short"
+    if desc == "音频过短":  # "Audio too short" - keep original Chinese as it's part of data processing logic
         desc = "[desc:]"
     else:
         DESC_START = "[desc] "

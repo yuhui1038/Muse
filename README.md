@@ -20,6 +20,15 @@ To set up the environment for Muse, you need to install the following dependenci
 
 Please refer to the respective repositories for detailed installation instructions. Make sure all dependencies are properly installed before running the training or inference scripts.
 
+## Repository Structure
+
+This repository contains the following main directories:
+
+- **`train/`**: Training scripts and utilities for fine-tuning the Muse model. See [`train/README.md`](train/README.md) for details.
+- **`infer/`**: Inference scripts for generating music with the Muse model. See [`infer/README.md`](infer/README.md) for details.
+- **`eval_pipeline/`**: Evaluation scripts for assessing model performance (Mulan-T, PER, AudioBox, SongEval, etc.).
+- **`data_pipeline/`**: Scripts for building and processing training data, including metadata processing, lyrics generation, and music generation utilities.
+
 ## Model Architecture
 
 <p align="center">

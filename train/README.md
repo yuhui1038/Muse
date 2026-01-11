@@ -51,6 +51,37 @@ huggingface-cli download bolshyC/Muse_train train_en.jsonl --local-dir ./data
 
 **Note:** In ms-swift, multiple dataset files should be comma-separated without spaces.
 
+## Building Custom Training Data
+
+If you want to build your own training dataset, you need to encode audio files into discrete tokens using MuCodec.
+
+### Audio Encoding
+
+Use `train/encode_audio.py` to encode audio files into discrete tokens:
+
+1. **Prepare input data file**: Create a JSONL file where each line contains a dictionary with an audio file path:
+   ```json
+   {"path": "path/to/audio1.wav"}
+   {"path": "path/to/audio2.mp3"}
+   ```
+
+2. **Modify paths in `encode_audio.py`**:
+   - Set `DATA_PATH` to your input JSONL file path
+   - Set `SAVE_DIR` to the directory where encoded tokens will be saved
+
+3. **Run encoding**:
+   ```bash
+   python train/encode_audio.py
+   ```
+
+The script will:
+- Load audio files from the paths specified in the JSONL file
+- Encode each audio file into discrete tokens using MuCodec
+- Save the encoded tokens as `.pt` files in the `SAVE_DIR` directory
+- Skip files that have already been encoded
+
+**Note:** The audio files should be in WAV or MP3 format and will be automatically resampled to 48kHz if needed.
+
 ## Training Performance
 
 ### Training Time

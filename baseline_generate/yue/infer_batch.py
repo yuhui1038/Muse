@@ -39,7 +39,7 @@ parser.add_argument(
     action="store_true",
     help="If set, disable sampling in Stage 1 generation (i.e., use deterministic decoding). When enabled, top_p/temperature will be ignored.",
 )
-# Prompt - 批量处理参数
+# Prompt - Batch processing parameters
 parser.add_argument("--jsonl_path", type=str, required=True, help="The file path to a JSONL file containing genre and lyrics for batch processing.")
 parser.add_argument("--start_idx", type=int, default=0, help="Start index in the JSONL file for batch processing.")
 parser.add_argument("--end_idx", type=int, default=-1, help="End index in the JSONL file for batch processing. -1 means process all.")
@@ -87,30 +87,30 @@ def seed_everything(seed=42):
 
 seed_everything(args.seed)
 
-# 读取 JSONL 文件
-print(f"正在读取 JSONL 文件: {args.jsonl_path}")
+# Read JSONL file
+print(f"Reading JSONL file: {args.jsonl_path}")
 music_data_list = []
 with open(args.jsonl_path, 'r', encoding='utf-8') as f:
     for line in f:
         if line.strip():
             music_data_list.append(json.loads(line))
 
-# 确定处理范围
+# Determine processing range
 start_idx = args.start_idx
 end_idx = len(music_data_list) if args.end_idx == -1 else min(args.end_idx, len(music_data_list))
 music_data_list = music_data_list[start_idx:end_idx]
-print(f"共有 {len(music_data_list)} 首歌曲待生成 (索引 {start_idx} 到 {end_idx-1})")
+print(f"Total {len(music_data_list)} songs to generate (indices {start_idx} to {end_idx-1})")
 
-# 检测已处理的歌曲 - 检查各阶段完成状态
+# Detect processed songs - check completion status of each stage
 def check_song_status(song_idx, output_dir):
     """
-    检查歌曲的处理状态
-    返回: (stage1_done, stage2_done, stage3_done, song_dir, stage1_output_set, stage2_output_dir)
+    Check song processing status
+    Returns: (stage1_done, stage2_done, stage3_done, song_dir, stage1_output_set, stage2_output_dir)
     """
     if not os.path.exists(output_dir):
         return False, False, False, None, None, None
     
-    # 查找该歌曲的目录（可能有多个，取最新的或第一个）
+    # Find song directory (may have multiple, take the latest or first)
     song_dirs = []
     for item in os.listdir(output_dir):
         if item.startswith('song_') and os.path.isdir(os.path.join(output_dir, item)):
@@ -124,10 +124,10 @@ def check_song_status(song_idx, output_dir):
     if not song_dirs:
         return False, False, False, None, None, None
     
-    # 使用最新的目录（按修改时间排序）
+    # Use the latest directory (sorted by modification time)
     song_dir = max(song_dirs, key=lambda x: os.path.getmtime(x))
     
-    # 检查 Stage 1: stage1 目录下是否有 vtrack 和 itrack 的 .npy 文件
+    # Check Stage 1: whether stage1 directory has vtrack and itrack .npy files
     stage1_dir = os.path.join(song_dir, "stage1")
     stage1_done = False
     stage1_output_set = []
@@ -137,23 +137,23 @@ def check_song_status(song_idx, output_dir):
         itrack_files = [f for f in stage1_files if '_itrack' in f]
         if vtrack_files and itrack_files:
             stage1_done = True
-            # 构建 stage1_output_set
+            # Build stage1_output_set
             for f in vtrack_files + itrack_files:
                 stage1_output_set.append(os.path.join(stage1_dir, f))
     
-    # 检查 Stage 2: stage2 目录下是否有对应的 .npy 文件
+    # Check Stage 2: whether stage2 directory has corresponding .npy files
     stage2_dir = os.path.join(song_dir, "stage2")
     stage2_done = False
     if stage1_done and os.path.exists(stage2_dir):
         stage2_files = [f for f in os.listdir(stage2_dir) if f.endswith('.npy')]
-        # 检查是否所有 stage1 文件都有对应的 stage2 文件
+        # Check if all stage1 files have corresponding stage2 files
         if stage1_output_set:
             stage1_basenames = {os.path.basename(f) for f in stage1_output_set}
             stage2_basenames = set(stage2_files)
             if stage1_basenames.issubset(stage2_basenames):
                 stage2_done = True
     
-    # 检查 Stage 3: 是否有最终混音文件（在 song_dir 根目录下）
+    # Check Stage 3: whether there is a final mixed file (in song_dir root directory)
     stage3_done = False
     for root, dirs, files in os.walk(song_dir):
         if any(f.endswith('_mixed.mp3') for f in files):
@@ -162,10 +162,10 @@ def check_song_status(song_idx, output_dir):
     
     return stage1_done, stage2_done, stage3_done, song_dir, stage1_output_set, stage2_dir
 
-# 检测所有歌曲的处理状态
+# Detect processing status of all songs
 song_status_map = {}  # {song_idx: (stage1_done, stage2_done, stage3_done, song_dir, stage1_output_set, stage2_output_dir)}
 if os.path.exists(args.output_dir):
-    print(f"\n正在检测已处理的歌曲...")
+    print(f"\nDetecting processed songs...")
     for list_idx in range(len(music_data_list)):
         song_idx = start_idx + list_idx
         stage1_done, stage2_done, stage3_done, song_dir, stage1_output_set, stage2_output_dir = check_song_status(song_idx, args.output_dir)
@@ -175,27 +175,27 @@ if os.path.exists(args.output_dir):
     if song_status_map:
         fully_completed = [idx for idx, (s1, s2, s3, _, _, _) in song_status_map.items() if s3]
         partial_completed = [idx for idx, (s1, s2, s3, _, _, _) in song_status_map.items() if not s3]
-        print(f"✓ 发现 {len(fully_completed)} 首完全完成的歌曲: {sorted(fully_completed)}")
+        print(f"✓ Found {len(fully_completed)} fully completed songs: {sorted(fully_completed)}")
         if partial_completed:
-            print(f"✓ 发现 {len(partial_completed)} 首部分完成的歌曲: {sorted(partial_completed)}")
+            print(f"✓ Found {len(partial_completed)} partially completed songs: {sorted(partial_completed)}")
             for idx in sorted(partial_completed):
                 s1, s2, s3, _, _, _ = song_status_map[idx]
                 status_parts = []
                 if s1: status_parts.append("Stage1")
                 if s2: status_parts.append("Stage2")
                 if s3: status_parts.append("Stage3")
-                print(f"  索引 {idx}: 已完成 {', '.join(status_parts)}")
+                print(f"  Index {idx}: Completed {', '.join(status_parts)}")
         remaining_count = len(music_data_list) - len(fully_completed)
-        print(f"✓ 将跳过完全完成的歌曲，还需处理 {remaining_count} 首")
+        print(f"✓ Will skip fully completed songs, {remaining_count} songs remaining to process")
     else:
-        print(f"✓ 未发现已处理的歌曲，将从头开始处理")
+        print(f"✓ No processed songs found, will start from the beginning")
 else:
-    print(f"✓ 输出目录不存在，将从头开始处理")
+    print(f"✓ Output directory does not exist, will start from the beginning")
 
-# load tokenizer and model
+# Load tokenizer and model
 device = torch.device(f"cuda:{cuda_idx}" if torch.cuda.is_available() else "cpu")
 mmtokenizer = _MMSentencePieceTokenizer("./mm_tokenizer_v0.2_hf/tokenizer.model")
-print("正在加载 Stage 1 模型...")
+print("Loading Stage 1 model...")
 model = AutoModelForCausalLM.from_pretrained(
     stage1_model, 
     torch_dtype=torch.bfloat16,
@@ -252,23 +252,23 @@ def encode_audio(codec_model, audio_prompt, device, target_bw=0.5):
 
 def split_lyrics(lyrics):
     """
-    将歌词按段落分割，遵循YuE官方最佳实践：
+    Split lyrics by segments, following YuE official best practices:
     
-    官方要求：
-    1. 歌词应该分段，使用结构标签：[verse], [chorus], [bridge], [outro] 等
-    2. 每个段落用两个换行符 "\n\n" 分隔
-    3. 每段约30秒（--max_new_tokens 3000时），不要放太多词
-    4. 避免使用 [intro] 标签（不太稳定），建议从 [verse] 或 [chorus] 开始
-    5. 支持多种语言：英语、中文、粤语、日语、韩语等
+    Official requirements:
+    1. Lyrics should be segmented using structure tags: [verse], [chorus], [bridge], [outro], etc.
+    2. Each segment is separated by two newlines "\n\n"
+    3. Each segment is about 30 seconds (when --max_new_tokens 3000), don't put too many words
+    4. Avoid using [intro] tag (not very stable), recommend starting with [verse] or [chorus]
+    5. Supports multiple languages: English, Chinese, Cantonese, Japanese, Korean, etc.
     
-    参数:
-        lyrics: 原始歌词字符串
+    Args:
+        lyrics: Raw lyrics string
     
-    返回:
-        结构化的歌词段落列表，每段以 [标签]\n内容\n\n 格式
+    Returns:
+        Structured lyrics segment list, each segment in [tag]\ncontent\n\n format
     """
-    # 正则表达式：匹配 [任意标签] 及其后的内容
-    # 支持: [Verse 1], [Pre-Chorus], [Chorus (Outro)] 等复杂标签
+    # Regular expression: match [any tag] and its following content
+    # Supports: [Verse 1], [Pre-Chorus], [Chorus (Outro)] and other complex tags
     pattern = r"\[([^\]]+)\](.*?)(?=\[|\Z)"
     segments = re.findall(pattern, lyrics, re.DOTALL)
     structured_lyrics = [f"[{seg[0]}]\n{seg[1].strip()}\n\n" for seg in segments]
@@ -353,27 +353,27 @@ def stage2_generate(model, prompt, batch_size=16):
 
 def sanitize_genres_for_filename(genres, max_length=80):
     """
-    清理和截断 genres 字符串，用于生成文件名
-    确保文件名不会过长（Linux 文件名限制为 255 字节）
+    Clean and truncate genres string for filename generation
+    Ensure filename is not too long (Linux filename limit is 255 bytes)
     
     Args:
-        genres: 原始 genres 字符串
-        max_length: genres 部分的最大长度（默认 80，为其他参数留出空间）
+        genres: Raw genres string
+        max_length: Maximum length of genres part (default 80, leaving space for other parameters)
     
     Returns:
-        清理后的 genres 字符串
+        Cleaned genres string
     """
     if not genres:
         return "Unknown"
     
-    # 清理不安全字符
+    # Clean unsafe characters
     genres_clean = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', genres)
     genres_clean = genres_clean.strip('_').strip()
     
-    # 如果包含逗号分隔的标签，尝试保留前几个标签
+    # If contains comma-separated tags, try to keep first few tags
     if ',' in genres_clean:
         tags = [tag.strip() for tag in genres_clean.split(',')]
-        # 尝试保留前几个标签，直到达到长度限制
+        # Try to keep first few tags until reaching length limit
         result_tags = []
         current_length = 0
         for tag in tags:
@@ -385,14 +385,14 @@ def sanitize_genres_for_filename(genres, max_length=80):
         if result_tags:
             genres_clean = ','.join(result_tags)
         else:
-            # 如果第一个标签就太长，直接截断
+            # If first tag is too long, directly truncate
             genres_clean = tags[0][:max_length] if tags else genres_clean[:max_length]
     
-    # 如果仍然太长，直接截断
+    # If still too long, directly truncate
     if len(genres_clean) > max_length:
         genres_clean = genres_clean[:max_length]
     
-    # 替换空格为连字符（保持一致性）
+    # Replace spaces with hyphens (for consistency)
     genres_clean = genres_clean.replace(' ', '-')
     
     return genres_clean
@@ -458,49 +458,49 @@ def stage2_inference(model, stage1_output_set, stage2_output_dir, batch_size=4):
     return stage2_result
 
 def process_one_song(music_data, song_idx, total_songs):
-    """处理单首歌曲的 Stage 1"""
+    """Process Stage 1 for a single song"""
     
-    # 兼容 genre 和 description 字段
+    # Compatible with genre and description fields
     genres = music_data.get('genre') or music_data.get('description', '')
     lyrics_raw = music_data['lyrics']
     description = music_data.get('description', '')
     
-    print(f"描述: {description[:100]}...")
-    print(f"流派标签: {genres}")
+    print(f"Description: {description[:100]}...")
+    print(f"Genre tags: {genres}")
     
-    # ===== 打印原始歌词 =====
+    # ===== Print original lyrics =====
     print("\n" + "="*60)
-    print("【原始歌词 (lyrics_raw)】")
+    print("【Original Lyrics (lyrics_raw)】")
     print("="*60)
     print(lyrics_raw)
     print("="*60 + "\n")
     
     lyrics = split_lyrics(lyrics_raw)
     
-    # 验证歌词格式并给出警告（遵循官方最佳实践）
-    print(f"歌词分析: 共识别到 {len(lyrics)} 个段落")
+    # Validate lyrics format and give warnings (following official best practices)
+    print(f"Lyrics analysis: Identified {len(lyrics)} segments")
     
-    # ===== 打印分割后的歌词段落 =====
+    # ===== Print segmented lyrics =====
     print("\n" + "="*60)
-    print("【分割后的歌词段落 (lyrics)】")
+    print("【Segmented Lyrics (lyrics)】")
     print("="*60)
     for i, seg in enumerate(lyrics):
         tag = seg.split('\n')[0].strip()
-        # 检查是否使用了不稳定的 [intro] 标签
+        # Check if unstable [intro] tag is used
         if 'intro' in tag.lower():
-            print(f"  ⚠️  警告: 段落 {i+1} 使用了 {tag} 标签，官方建议避免使用 [intro]，推荐用 [verse] 或 [chorus]")
+            print(f"  ⚠️  Warning: Segment {i+1} uses {tag} tag, official recommendation is to avoid [intro], use [verse] or [chorus] instead")
         else:
-            print(f"  段落 {i+1}. {tag}")
-        # 打印每个段落的内容（限制长度）
+            print(f"  Segment {i+1}. {tag}")
+        # Print each segment's content (limit length)
         content = seg.strip()
         if len(content) > 150:
-            print(f"    内容预览: {content[:150]}...")
+            print(f"    Content preview: {content[:150]}...")
         else:
-            print(f"    内容: {content}")
+            print(f"    Content: {content}")
         print()
     print("="*60 + "\n")
     
-    # 创建此歌曲专属的输出目录
+    # Create output directory for this song
     random_id = uuid.uuid4()
     song_output_dir = os.path.join(args.output_dir, f"song_{song_idx:04d}_{random_id}")
     stage1_output_dir = os.path.join(song_output_dir, "stage1")
@@ -508,27 +508,27 @@ def process_one_song(music_data, song_idx, total_songs):
     os.makedirs(stage1_output_dir, exist_ok=True)
     os.makedirs(stage2_output_dir, exist_ok=True)
     
-    # Stage 1: 生成音频 tokens
-    print("--- Stage 1: 生成音频 tokens ---")
+    # Stage 1: Generate audio tokens
+    print("--- Stage 1: Generate audio tokens ---")
     stage1_output_set = []
     full_lyrics = "\n".join(lyrics)
     prompt_texts = [f"Generate music from the given lyrics segment by segment.\n[Genre] {genres}\n{full_lyrics}"]
     prompt_texts += lyrics
     
-    # ===== 打印传入模型的提示文本 =====
+    # ===== Print prompt texts passed to model =====
     print("\n" + "="*60)
-    print("【传入模型的提示文本 (prompt_texts)】")
+    print("【Prompt Texts Passed to Model (prompt_texts)】")
     print("="*60)
-    print(f"总共 {len(prompt_texts)} 个提示（第1个是完整提示，后续是各个段落）\n")
+    print(f"Total {len(prompt_texts)} prompts (first is full prompt, subsequent are segments)\n")
     for i, pt in enumerate(prompt_texts):
         if i == 0:
-            print(f"提示 {i} [完整提示头部]:")
+            print(f"Prompt {i} [Full prompt header]:")
             if len(pt) > 300:
                 print(f"{pt[:300]}...")
             else:
                 print(pt)
         else:
-            print(f"\n提示 {i} [段落 {i}]:")
+            print(f"\nPrompt {i} [Segment {i}]:")
             if len(pt) > 200:
                 print(f"{pt[:200]}...")
             else:
@@ -541,32 +541,32 @@ def process_one_song(music_data, song_idx, total_songs):
     temperature = 1.0
     repetition_penalty = args.repetition_penalty
     if not do_sample_stage1:
-        print("注意: 已启用 --no_sample，Stage 1 将使用确定性解码；top_p/temperature 将被忽略。")
+        print("Note: --no_sample is enabled, Stage 1 will use deterministic decoding; top_p/temperature will be ignored.")
     # special tokens
     start_of_segment = mmtokenizer.tokenize('[start_of_segment]')
     end_of_segment = mmtokenizer.tokenize('[end_of_segment]')
     # Format text prompt
-    # +1是因为prompt_texts[0]是完整提示会被跳过，所以需要len(lyrics)+1来处理所有段落
+    # +1 because prompt_texts[0] is the full prompt which will be skipped, so need len(lyrics)+1 to process all segments
     run_n_segments = min(args.run_n_segments+1, len(lyrics)+1)
     
     for i, p in enumerate(tqdm(prompt_texts[:run_n_segments], desc="Stage1 inference")):
         section_text = p.replace('[start_of_segment]', '').replace('[end_of_segment]', '')
         guidance_scale = 1.5 if i <=1 else 1.2
         
-        # ===== 打印当前处理的段落 =====
+        # ===== Print currently processing segment =====
         if i == 0:
-            print(f"\n[段落 {i}] 跳过（完整提示头部）")
+            print(f"\n[Segment {i}] Skipped (full prompt header)")
         else:
             print(f"\n" + "-"*60)
-            print(f"[正在处理段落 {i}/{len(prompt_texts[:run_n_segments])-1}]")
+            print(f"[Processing segment {i}/{len(prompt_texts[:run_n_segments])-1}]")
             print("-"*60)
             tag_line = section_text.split('\n')[0] if '\n' in section_text else section_text[:50]
-            print(f"段落标签: {tag_line}")
-            print(f"段落内容长度: {len(section_text)} 字符")
+            print(f"Segment tag: {tag_line}")
+            print(f"Segment content length: {len(section_text)} characters")
             if len(section_text) > 200:
-                print(f"段落内容预览: {section_text[:200]}...")
+                print(f"Segment content preview: {section_text[:200]}...")
             else:
-                print(f"段落内容: {section_text}")
+                print(f"Segment content: {section_text}")
             print("-"*60)
         
         if i==0:
@@ -648,7 +648,7 @@ def process_one_song(music_data, song_idx, total_songs):
         instrumentals.append(instrumentals_ids)
     vocals = np.concatenate(vocals, axis=1)
     instrumentals = np.concatenate(instrumentals, axis=1)
-    # 清理 genres 字符串，避免文件名过长
+    # Clean genres string to avoid filename being too long
     genres_clean = sanitize_genres_for_filename(genres, max_length=80)
     vocal_save_path = os.path.join(stage1_output_dir, f"{genres_clean}_tp{top_p}_T{temperature}_rp{repetition_penalty}_maxtk{max_new_tokens}_{random_id}_vtrack".replace('.', '@')+'.npy')
     inst_save_path = os.path.join(stage1_output_dir, f"{genres_clean}_tp{top_p}_T{temperature}_rp{repetition_penalty}_maxtk{max_new_tokens}_{random_id}_itrack".replace('.', '@')+'.npy')
@@ -659,9 +659,9 @@ def process_one_song(music_data, song_idx, total_songs):
     
     return stage1_output_set, stage2_output_dir, song_output_dir
 
-# 加载 Stage 2 模型和 vocoder（只加载一次）
+# Load Stage 2 model and vocoder (load only once)
 print("\n" + "="*60)
-print("正在加载 Stage 2 模型...")
+print("Loading Stage 2 model...")
 print("="*60)
 model_stage2 = AutoModelForCausalLM.from_pretrained(
     stage2_model, 
@@ -678,21 +678,21 @@ if torch.__version__ >= "2.0.0":
     except Exception as e:
         print(f"Warning: torch.compile not available: {e}")
 
-print("正在加载 vocoder...")
+print("Loading vocoder...")
 vocal_decoder, inst_decoder = build_codec_model(args.config_path, args.vocal_decoder_path, args.inst_decoder_path)
 
-# 批量处理所有歌曲 - 每首歌曲完整处理后再继续下一首
+# Batch process all songs - process each song completely before continuing to next
 all_results = []
 skipped_count = 0
 for list_idx, music_data in enumerate(music_data_list):
-    # 计算真实的歌曲索引（考虑 start_idx 偏移）
+    # Calculate actual song index (considering start_idx offset)
     song_idx = start_idx + list_idx
     
     try:
-        # 兼容 genre 和 description 字段
+        # Compatible with genre and description fields
         genres = music_data.get('genre') or music_data.get('description', '')
         
-        # 检查处理状态
+        # Check processing status
         stage1_done = False
         stage2_done = False
         stage3_done = False
@@ -703,48 +703,48 @@ for list_idx, music_data in enumerate(music_data_list):
         if song_idx in song_status_map:
             stage1_done, stage2_done, stage3_done, song_output_dir, stage1_output_set, stage2_output_dir = song_status_map[song_idx]
         
-        # 如果全部完成，跳过
+        # If all completed, skip
         if stage3_done:
             print(f"\n{'='*60}")
-            print(f"⏭️  跳过第 {list_idx+1}/{len(music_data_list)} 首歌曲（索引 {song_idx}，已完全完成）")
+            print(f"⏭️  Skipping song {list_idx+1}/{len(music_data_list)} (index {song_idx}, fully completed)")
             print(f"{'='*60}")
             skipped_count += 1
             continue
         
-        # 根据完成状态决定从哪个阶段开始
+        # Decide which stage to start from based on completion status
         print(f"\n{'='*60}")
-        print(f"开始处理第 {list_idx+1}/{len(music_data_list)} 首歌曲（索引 {song_idx}）")
+        print(f"Starting to process song {list_idx+1}/{len(music_data_list)} (index {song_idx})")
         if stage1_done:
-            print(f"  ✓ Stage 1 已完成，将从 Stage 2 开始")
+            print(f"  ✓ Stage 1 completed, will start from Stage 2")
         if stage2_done:
-            print(f"  ✓ Stage 2 已完成，将从 Stage 3 开始")
+            print(f"  ✓ Stage 2 completed, will start from Stage 3")
         print(f"{'='*60}")
         
-        # Stage 1: 生成音频 tokens（如果未完成）
+        # Stage 1: Generate audio tokens (if not completed)
         if not stage1_done:
             stage1_output_set, stage2_output_dir, song_output_dir = process_one_song(music_data, song_idx, len(music_data_list))
-            print(f"✓ Stage 1 完成，生成了 {len(stage1_output_set)} 个文件")
+            print(f"✓ Stage 1 completed, generated {len(stage1_output_set)} files")
             for f in stage1_output_set:
                 print(f"  - {os.path.basename(f)}")
         else:
-            print(f"⏭️  跳过 Stage 1（已完成）")
-            print(f"  使用已有的 Stage 1 输出:")
+            print(f"⏭️  Skipping Stage 1 (completed)")
+            print(f"  Using existing Stage 1 outputs:")
             for f in stage1_output_set:
                 print(f"    - {os.path.basename(f)}")
         
-        # 注意：不要在这里卸载 Stage 1 模型，因为后续歌曲还需要使用
-        # Stage 1 模型会在所有歌曲处理完成后统一卸载
+        # Note: Do not unload Stage 1 model here, as subsequent songs still need it
+        # Stage 1 model will be unloaded uniformly after all songs are processed
         
-        # Stage 2: 处理音频 tokens（如果未完成）
+        # Stage 2: Process audio tokens (if not completed)
         if not stage2_done:
-            print(f"\n--- Stage 2: 处理第 {list_idx+1} 首歌曲（索引 {song_idx}）---")
+            print(f"\n--- Stage 2: Processing song {list_idx+1} (index {song_idx}) ---")
             stage2_result = stage2_inference(model_stage2, stage1_output_set, stage2_output_dir, batch_size=args.stage2_batch_size)
-            print(f"✓ Stage 2 完成，生成了 {len(stage2_result)} 个文件")
+            print(f"✓ Stage 2 completed, generated {len(stage2_result)} files")
             for f in stage2_result:
                 print(f"  - {os.path.basename(f)}")
         else:
-            print(f"\n⏭️  跳过 Stage 2（已完成）")
-            # 获取已有的 stage2 结果
+            print(f"\n⏭️  Skipping Stage 2 (completed)")
+            # Get existing stage2 results
             stage2_result = []
             if os.path.exists(stage2_output_dir):
                 for f in stage1_output_set:
@@ -752,14 +752,14 @@ for list_idx, music_data in enumerate(music_data_list):
                     stage2_file = os.path.join(stage2_output_dir, basename)
                     if os.path.exists(stage2_file):
                         stage2_result.append(stage2_file)
-            print(f"  使用已有的 Stage 2 输出:")
+            print(f"  Using existing Stage 2 outputs:")
             for f in stage2_result:
                 print(f"    - {os.path.basename(f)}")
         
-        # Stage 3: 重建音频和混音（如果未完成）
+        # Stage 3: Reconstruct audio and mix (if not completed)
         final_output = None
         if not stage3_done:
-            print(f"\n--- Stage 3: 重建第 {list_idx+1} 首歌曲的音频（索引 {song_idx}）---")
+            print(f"\n--- Stage 3: Reconstructing audio for song {list_idx+1} (index {song_idx}) ---")
             
             # reconstruct tracks
             recons_output_dir = os.path.join(song_output_dir, "recons")
@@ -832,10 +832,10 @@ for list_idx, music_data in enumerate(music_data_list):
                 mix_output = instrumental_output + vocal_output
                 vocoder_mix = os.path.join(vocoder_mix_dir, os.path.basename(recons_mix))
                 save_audio(mix_output, vocoder_mix, 44100, args.rescale)
-                print(f"创建混音: {vocoder_mix}")
+                print(f"Created mix: {vocoder_mix}")
             except RuntimeError as e:
                 print(e)
-                print(f"混音失败! inst: {instrumental_output.shape}, vocal: {vocal_output.shape}")
+                print(f"Mix failed! inst: {instrumental_output.shape}, vocal: {vocal_output.shape}")
 
             # Post process
             if recons_mix and vocoder_mix:
@@ -846,16 +846,16 @@ for list_idx, music_data in enumerate(music_data_list):
                     c_file=final_output,
                     cutoff_freq=5500.0
                 )
-                print(f"✓ 第 {list_idx+1} 首歌曲（索引 {song_idx}）完成! 输出: {final_output}")
+                print(f"✓ Song {list_idx+1} (index {song_idx}) completed! Output: {final_output}")
         else:
-            print(f"\n⏭️  跳过 Stage 3（已完成）")
-            # 查找最终输出文件（通常在 song_dir 根目录下）
-            # 先检查根目录
+            print(f"\n⏭️  Skipping Stage 3 (completed)")
+            # Find final output file (usually in song_dir root directory)
+            # First check root directory
             root_files = [f for f in os.listdir(song_output_dir) if f.endswith('_mixed.mp3')]
             if root_files:
                 final_output = os.path.join(song_output_dir, root_files[0])
             else:
-                # 如果根目录没有，遍历子目录查找
+                # If root directory doesn't have it, traverse subdirectories to find
                 for root, dirs, files in os.walk(song_output_dir):
                     for f in files:
                         if f.endswith('_mixed.mp3'):
@@ -864,7 +864,7 @@ for list_idx, music_data in enumerate(music_data_list):
                     if final_output:
                         break
             if final_output:
-                print(f"  最终输出: {final_output}")
+                print(f"  Final output: {final_output}")
         
         all_results.append({
             'song_idx': song_idx,
@@ -873,14 +873,14 @@ for list_idx, music_data in enumerate(music_data_list):
         })
         
     except Exception as e:
-        print(f"✗ 处理第 {list_idx+1} 首歌曲（索引 {song_idx}）时出错: {e}")
+        print(f"✗ Error processing song {list_idx+1} (index {song_idx}): {e}")
         import traceback
         traceback.print_exc()
         continue
 
-# 所有歌曲处理完成后，卸载模型释放内存
+# After all songs are processed, unload models to free memory
 if not args.disable_offload_model:
-    print("\n清理模型以释放内存...")
+    print("\nCleaning up models to free memory...")
     if 'model' in locals():
         model.cpu()
         del model
@@ -888,17 +888,17 @@ if not args.disable_offload_model:
         model_stage2.cpu()
         del model_stage2
     torch.cuda.empty_cache()
-    print("模型已卸载")
+    print("Models unloaded")
 
 print("\n" + "="*60)
-print("批量生成完成!")
+print("Batch generation complete!")
 newly_processed = len([r for r in all_results if r.get('output_path')])
-print(f"✓ 本次新处理: {newly_processed} 首歌曲")
+print(f"✓ Newly processed: {newly_processed} songs")
 if skipped_count > 0:
-    print(f"⏭️  跳过已完成: {skipped_count} 首歌曲")
-print(f"📊 总计完成: {newly_processed + skipped_count} 首歌曲")
+    print(f"⏭️  Skipped (already completed): {skipped_count} songs")
+print(f"📊 Total completed: {newly_processed + skipped_count} songs")
 print("="*60)
 for result in all_results:
     if result.get('output_path'):
-        print(f"歌曲 {result['song_idx']+1}: {result['output_path']}")
+        print(f"Song {result['song_idx']+1}: {result['output_path']}")
 

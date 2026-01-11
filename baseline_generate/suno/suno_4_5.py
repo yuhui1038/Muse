@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Suno API 批量生成 - V4.5 专用版
-支持模型: V4_5 (默认), V4_5PLUS, V4_5ALL
+Suno API Batch Generation - V4.5 Special Edition
+Supported models: V4_5 (default), V4_5PLUS, V4_5ALL
 """
 import json
 import time
@@ -20,40 +20,40 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import SUNO_API_KEY
 
 
-# 配置日志
+# Configure logging
 def setup_logging(output_dir):
     log_file = os.path.join(output_dir, f"run_log_v4_5_{time.strftime('%Y%m%d_%H%M%S')}.txt")
     
-    # 创建 logger
+    # Create logger
     logger = logging.getLogger('SunoBatchV4_5')
     logger.setLevel(logging.INFO)
     
-    # 清除旧的 handler
+    # Clear old handlers
     if logger.hasHandlers():
         logger.handlers.clear()
         
-    # 文件 Handler
+    # File Handler
     file_handler = logging.FileHandler(log_file, encoding='utf-8')
     file_handler.setFormatter(logging.Formatter('%(message)s'))
     logger.addHandler(file_handler)
     
-    # 控制台 Handler
+    # Console Handler
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(logging.Formatter('%(message)s'))
     logger.addHandler(console_handler)
     
     return logger, log_file
 
-# 全局 logger
+# Global logger
 logger = logging.getLogger('SunoBatchV4_5')
 
-# 替换 print 为 logger.info
+# Replace print with logger.info
 def print_log(msg):
     logger.info(msg)
 
 
 class SunoAPI:
-    """简化的 Suno API 客户端"""
+    """Simplified Suno API client"""
     
     def __init__(self, api_key):
         self.api_key = api_key
@@ -63,20 +63,20 @@ class SunoAPI:
             'Content-Type': 'application/json'
         }
         
-        # 配置重试策略
+        # Configure retry strategy
         self.session = requests.Session()
         retry_strategy = Retry(
-            total=5,  # 最大重试次数
-            backoff_factor=1,  # 重试间隔 (1s, 2s, 4s, 8s...)
-            status_forcelist=[500, 502, 503, 504],  # 需要重试的状态码
-            allowed_methods=["HEAD", "GET", "POST", "OPTIONS"]  # 允许重试的方法
+            total=5,  # Maximum retry count
+            backoff_factor=1,  # Retry interval (1s, 2s, 4s, 8s...)
+            status_forcelist=[500, 502, 503, 504],  # Status codes that need retry
+            allowed_methods=["HEAD", "GET", "POST", "OPTIONS"]  # Allowed retry methods
         )
         adapter = HTTPAdapter(max_retries=retry_strategy)
         self.session.mount("https://", adapter)
         self.session.mount("http://", adapter)
     
     def generate_music(self, prompt, model='V4_5', vocalGender=None, **options):
-        """生成音乐"""
+        """Generate music"""
         payload = {
             'prompt': prompt,
             'model': model,
@@ -95,25 +95,25 @@ class SunoAPI:
                 timeout=30
             )
             
-            # 检查 HTTP 错误
+            # Check HTTP errors
             response.raise_for_status()
             
-            # 尝试解析 JSON
+            # Try to parse JSON
             try:
                 result = response.json()
             except json.JSONDecodeError:
-                raise Exception(f"API 返回非 JSON 响应: {response.text[:200]}")
+                raise Exception(f"API returned non-JSON response: {response.text[:200]}")
                 
             if result.get('code') != 200:
-                raise Exception(f"生成失败: {result.get('msg', result)}")
+                raise Exception(f"Generation failed: {result.get('msg', result)}")
             
             return result['data']['taskId']
             
         except requests.exceptions.RequestException as e:
-            raise Exception(f"请求异常: {str(e)}")
+            raise Exception(f"Request exception: {str(e)}")
     
     def get_task_status(self, task_id):
-        """获取任务状态"""
+        """Get task status"""
         try:
             response = self.session.get(
                 f'{self.base_url}/generate/record-info?taskId={task_id}',
@@ -123,12 +123,12 @@ class SunoAPI:
             response.raise_for_status()
             return response.json().get('data', {})
         except Exception as e:
-            # 状态查询失败不应导致程序崩溃，返回空字典或抛出特定异常
-            # print_log(f"获取状态失败: {e}")
+            # Status query failure should not crash the program, return empty dict or throw specific exception
+            # print_log(f"Failed to get status: {e}")
             raise e
     
     def get_timestamped_lyrics(self, task_id, audio_id):
-        """获取带时间戳的歌词"""
+        """Get timestamped lyrics"""
         payload = {
             'taskId': task_id,
             'audioId': audio_id
@@ -144,10 +144,10 @@ class SunoAPI:
             response.raise_for_status()
             return response.json()
         except Exception:
-            return {}  # 歌词获取失败非致命错误
+            return {}  # Lyrics retrieval failure is non-fatal error
     
     def wait_for_completion(self, task_id, max_wait_time=600, check_interval=5):
-        """等待任务完成，返回结果和轮询统计"""
+        """Wait for task completion, return result and polling statistics"""
         start_time = time.time()
         poll_count = 0
         total_poll_time = 0
@@ -170,7 +170,7 @@ class SunoAPI:
                         'avg_poll_time': total_poll_time / poll_count if poll_count > 0 else 0
                     }
                 elif current_status == 'FAILED':
-                    raise Exception(f"任务失败: {status.get('errorMessage')}")
+                    raise Exception(f"Task failed: {status.get('errorMessage')}")
                 
                 time.sleep(check_interval)
             except Exception as e:
@@ -178,15 +178,15 @@ class SunoAPI:
                     raise
                 time.sleep(check_interval)
         
-        raise Exception('任务超时')
+        raise Exception('Task timeout')
     
     def download_file(self, url, save_path):
-        """下载文件到本地，返回下载统计"""
+        """Download file to local, return download statistics"""
         try:
             start_time = time.time()
             downloaded_bytes = 0
             
-            # 使用 session 下载
+            # Use session to download
             with self.session.get(url, stream=True, timeout=60) as r:
                 r.raise_for_status()
                 with open(save_path, 'wb') as f:
@@ -202,19 +202,19 @@ class SunoAPI:
                 'speed': downloaded_bytes / download_time if download_time > 0 else 0
             }
         except Exception as e:
-            print_log(f"下载失败 {url}: {e}")
+            print_log(f"Download failed {url}: {e}")
             return {'success': False, 'error': str(e)}
 
 
-# 结果记录锁
+# Result record lock
 result_lock = Lock()
 
 def save_result_record(output_dir, record):
-    """实时保存单条结果到 CSV"""
+    """Save single result to CSV in real-time"""
     file_path = os.path.join(output_dir, "generation_results.csv")
     file_exists = os.path.isfile(file_path)
     
-    # 只需要记录关键信息
+    # Only record key information
     row = {
         'song_id': record.get('song_id'),
         'task_id': record.get('task_id'),
@@ -234,10 +234,10 @@ def save_result_record(output_dir, record):
 
 
 class ImprovedRateLimiter:
-    """改进的速率限制器（带统计功能）
+    """Improved rate limiter (with statistics)
     
-    精确控制：每10秒最多8次请求
-    使用滑动窗口算法，确保任意10秒时间窗口内不超过8次请求
+    Precise control: maximum 8 requests per 10 seconds
+    Uses sliding window algorithm to ensure no more than 8 requests in any 10-second time window
     """
     
     def __init__(self, max_requests=5, time_window=10):
@@ -247,45 +247,45 @@ class ImprovedRateLimiter:
         self.lock = Lock()
         self.semaphore = Semaphore(max_requests)
         
-        # 统计信息
+        # Statistics
         self.total_wait_time = 0
         self.wait_count = 0
         self.total_requests = 0
     
     def acquire(self):
-        """获取请求许可"""
+        """Acquire request permission"""
         with self.lock:
             now = time.time()
             
-            # 清理过期的请求记录
+            # Clean expired request records
             while self.request_times and now - self.request_times[0] >= self.time_window:
                 self.request_times.popleft()
             
-            # 如果已达到限制，计算需要等待的时间
+            # If limit reached, calculate wait time needed
             wait_time = 0
             if len(self.request_times) >= self.max_requests:
                 oldest_request = self.request_times[0]
-                wait_time = self.time_window - (now - oldest_request) + 0.05  # 加缓冲
+                wait_time = self.time_window - (now - oldest_request) + 0.05  # Add buffer
                 
                 if wait_time > 0:
-                    print_log(f"  [速率限制] 等待 {wait_time:.2f} 秒...")
+                    print_log(f"  [Rate Limit] Waiting {wait_time:.2f} seconds...")
                     time.sleep(wait_time)
                     
-                    # 统计等待时间
+                    # Record wait time
                     self.total_wait_time += wait_time
                     self.wait_count += 1
                     
-                    # 重新清理
+                    # Re-clean
                     now = time.time()
                     while self.request_times and now - self.request_times[0] >= self.time_window:
                         self.request_times.popleft()
             
-            # 记录本次请求时间
+            # Record this request time
             self.request_times.append(time.time())
             self.total_requests += 1
             
     def get_current_rate(self):
-        """获取当前速率（最近10秒内的请求数）"""
+        """Get current rate (number of requests in last 10 seconds)"""
         with self.lock:
             now = time.time()
             while self.request_times and now - self.request_times[0] >= self.time_window:
@@ -293,7 +293,7 @@ class ImprovedRateLimiter:
             return len(self.request_times)
     
     def get_stats(self):
-        """获取统计信息"""
+        """Get statistics"""
         with self.lock:
             return {
                 'total_requests': self.total_requests,
@@ -303,13 +303,13 @@ class ImprovedRateLimiter:
             }
 
 
-# 全局速率限制器 (5次/10秒)
+# Global rate limiter (5 requests per 10 seconds)
 rate_limiter = ImprovedRateLimiter(max_requests=5, time_window=10)
 
 
 def submit_generation_task(api, song_index, data):
-    """第一阶段：提交生成任务（受速率限制）"""
-    # 使用 sunov4_5_000001 格式
+    """Phase 1: Submit generation task (rate limited)"""
+    # Use sunov4_5_000001 format
     song_id = data.get("id", f"sunov4_5_{song_index:06d}")
     
     try:
@@ -317,28 +317,28 @@ def submit_generation_task(api, song_index, data):
         lyrics = data.get("lyrics", "")
         vocal_gender = data.get("vocalGender")
         
-        print_log(f"[歌曲 {song_id}] 提交任务... (当前速率: {rate_limiter.get_current_rate()}/5)")
+        print_log(f"[Song {song_id}] Submitting task... (current rate: {rate_limiter.get_current_rate()}/5)")
         
-        # 记录请求开始时间
+        # Record request start time
         request_start = time.time()
         
-        # 速率限制
+        # Rate limiting
         rate_limiter.acquire()
         
-        # 提交任务
+        # Submit task
         submit_start = time.time()
         task_id = api.generate_music(
             prompt=lyrics,
             style=description,
             title=f"Song_{song_id}",
-            model='V4_5', # 显式指定 V4.5 模型
+            model='V4_5', # Explicitly specify V4.5 model
             customMode=True,
             instrumental=False,
             vocalGender=vocal_gender
         )
         request_time = time.time() - submit_start
         
-        print_log(f"[歌曲 {song_id}] ✓ 任务已提交，ID: {task_id}")
+        print_log(f"[Song {song_id}] ✓ Task submitted, ID: {task_id}")
         
         return {
             'song_id': song_id,
@@ -351,8 +351,8 @@ def submit_generation_task(api, song_index, data):
         }
         
     except Exception as e:
-        print_log(f"[歌曲 {song_id}] ✗ 提交失败: {e}")
-        # 如果提交失败，也记录下来（虽然还没到下载阶段）
+        print_log(f"[Song {song_id}] ✗ Submission failed: {e}")
+        # If submission fails, also record it (even though not at download stage yet)
         return {
             'song_id': song_id,
             'song_index': song_index,
@@ -362,7 +362,7 @@ def submit_generation_task(api, song_index, data):
 
 
 def wait_and_download_result(api, task_info, output_dir):
-    """第二阶段：等待结果并下载（不受速率限制）"""
+    """Phase 2: Wait for result and download (not rate limited)"""
     if not task_info['success']:
         return task_info
     
@@ -377,13 +377,13 @@ def wait_and_download_result(api, task_info, output_dir):
         lyrics = data.get("lyrics", "")
         description = data.get("description", "")
         
-        print_log(f"[歌曲 {song_id}] 等待生成完成...")
+        print_log(f"[Song {song_id}] Waiting for generation to complete...")
         
-        # 等待完成（返回详细统计）
+        # Wait for completion (returns detailed statistics)
         wait_result = api.wait_for_completion(task_id, max_wait_time=600, check_interval=8)
         result = wait_result['result']
         
-        # 处理返回结果
+        # Process returned result
         tracks = []
         if isinstance(result, dict):
             if 'data' in result:
@@ -397,15 +397,15 @@ def wait_and_download_result(api, task_info, output_dir):
                         break
         
         if not tracks:
-            raise Exception("未找到音频轨道数据")
+            raise Exception("Audio track data not found")
         
-        # 下载阶段统计
+        # Download phase statistics
         download_start = time.time()
         downloaded_files = []
         total_download_bytes = 0
         download_count = 0
         
-        # 处理每个轨道
+        # Process each track
         for track_idx, track in enumerate(tracks):
             audio_url = track.get('audioUrl') or track.get('audio_url')
             audio_id = track.get('id')
@@ -414,7 +414,7 @@ def wait_and_download_result(api, task_info, output_dir):
             audio_path = os.path.join(output_dir, f"{base_filename}.mp3")
             lyrics_path = os.path.join(output_dir, f"{base_filename}_lyrics.json")
             
-            # 下载音频
+            # Download audio
             if audio_url:
                 download_result = api.download_file(audio_url, audio_path)
                 if download_result['success']:
@@ -422,7 +422,7 @@ def wait_and_download_result(api, task_info, output_dir):
                     total_download_bytes += download_result['bytes']
                     download_count += 1
             
-            # 获取时间戳歌词
+            # Get timestamped lyrics
             timestamped_lyrics_data = None
             if audio_id:
                 try:
@@ -430,9 +430,9 @@ def wait_and_download_result(api, task_info, output_dir):
                     if lyrics_response.get('code') == 200:
                         timestamped_lyrics_data = lyrics_response.get('data')
                 except Exception as e:
-                    print_log(f"[歌曲 {song_id}] 轨道 {track_idx+1}: 获取歌词失败: {e}")
+                    print_log(f"[Song {song_id}] Track {track_idx+1}: Failed to get lyrics: {e}")
             
-            # 保存歌词和元数据
+            # Save lyrics and metadata
             lyrics_content = {
                 "song_id": song_id,
                 "song_index": song_index,
@@ -451,7 +451,7 @@ def wait_and_download_result(api, task_info, output_dir):
         download_time = time.time() - download_start
         total_time = time.time() - start_time
         
-        print_log(f"[歌曲 {song_id}] ✓ 完成! {len(tracks)} 个轨道，耗时 {total_time:.1f} 秒")
+        print_log(f"[Song {song_id}] ✓ Complete! {len(tracks)} tracks, took {total_time:.1f} seconds")
         
         final_result = {
             'song_id': song_id,
@@ -471,13 +471,13 @@ def wait_and_download_result(api, task_info, output_dir):
             'avg_download_speed': total_download_bytes / download_time if download_time > 0 else 0
         }
         
-        # 实时保存结果
+        # Save result in real-time
         save_result_record(output_dir, final_result)
         return final_result
         
     except Exception as e:
         total_time = time.time() - start_time
-        print_log(f"[歌曲 {song_id}] ✗ 处理失败: {e} (耗时 {total_time:.1f} 秒)")
+        print_log(f"[Song {song_id}] ✗ Processing failed: {e} (took {total_time:.1f} seconds)")
         
         error_result = {
             'song_id': song_id,
@@ -489,13 +489,13 @@ def wait_and_download_result(api, task_info, output_dir):
             'submit_time': start_time
         }
         
-        # 实时保存结果
+        # Save result in real-time
         save_result_record(output_dir, error_result)
         return error_result
 
 
 def format_bytes(bytes_size):
-    """格式化字节大小"""
+    """Format byte size"""
     for unit in ['B', 'KB', 'MB', 'GB']:
         if bytes_size < 1024.0:
             return f"{bytes_size:.2f} {unit}"
@@ -504,49 +504,49 @@ def format_bytes(bytes_size):
 
 
 def format_speed(bytes_per_sec):
-    """格式化速度"""
+    """Format speed"""
     return f"{format_bytes(bytes_per_sec)}/s"
 
 
 def main():
-    """主程序 - 两阶段并发处理"""
+    """Main program - two-phase concurrent processing"""
     input_file = "cleaned_data_truncated.json"
     output_dir = "sunov4_5_truncated"
-    # 创建输出目录
+    # Create output directory
     os.makedirs(output_dir, exist_ok=True)
     
-    # 初始化日志
+    # Initialize logging
     global logger
     logger, log_file = setup_logging(output_dir)
     
     print_log("=" * 70)
-    print_log("Suno API 批量生成 - V4.5 专用版")
-    print_log("策略: 快速提交(5次/10秒) + 并行等待 + 详细性能分析")
-    print_log(f"日志文件: {log_file}")
+    print_log("Suno API Batch Generation - V4.5 Special Edition")
+    print_log("Strategy: Fast submission (5 requests/10s) + Parallel waiting + Detailed performance analysis")
+    print_log(f"Log file: {log_file}")
     print_log("=" * 70)
     
-    # 读取输入文件
+    # Read input file
     try:
         all_data = []
         if input_file.endswith('.jsonl'):
             try:
                 with open(input_file, 'r', encoding='utf-8') as f:
-                    # 尝试读取第一行来判断格式
+                    # Try reading first line to determine format
                     first_line = f.readline().strip()
                     if first_line.startswith('['):
-                        # 看起来像普通 JSON 数组
+                        # Looks like regular JSON array
                         f.seek(0)
                         all_data = json.load(f)
                     else:
-                        # 尝试逐行读取
+                        # Try reading line by line
                         f.seek(0)
                         for i, line in enumerate(f):
                             line = line.strip()
                             if line:
                                 all_data.append(json.loads(line))
             except json.JSONDecodeError:
-                # 如果上述解析失败，最后尝试一次整体读取
-                print_log(f"注意: 按 JSONL 格式解析 {input_file} 失败，尝试作为普通 JSON 读取...")
+                # If above parsing fails, try one final read as regular JSON
+                print_log(f"Note: Failed to parse {input_file} as JSONL format, trying as regular JSON...")
                 with open(input_file, 'r', encoding='utf-8') as f:
                     all_data = json.load(f)
         else:
@@ -554,51 +554,51 @@ def main():
                 all_data = json.load(f)
         
     except FileNotFoundError:
-        print_log(f"文件 {input_file} 未找到.")
+        print_log(f"File {input_file} not found.")
         return
     except json.JSONDecodeError as e:
-        print_log(f"JSON 解析错误: {e}")
+        print_log(f"JSON parsing error: {e}")
         return
     
-    # 初始化 API
+    # Initialize API
     api = SunoAPI(SUNO_API_KEY)
     
-    print_log(f"\n准备生成 {len(all_data)} 首歌曲...")
-    print_log(f"开始时间: {time.strftime('%H:%M:%S')}\n")
+    print_log(f"\nPreparing to generate {len(all_data)} songs...")
+    print_log(f"Start time: {time.strftime('%H:%M:%S')}\n")
     
     overall_start_time = time.time()
     
-    # ===== 第一阶段：批量提交 =====
+    # ===== Phase 1: Batch Submission =====
     print_log("\n" + "=" * 70)
-    print_log("第一阶段：批量提交")
+    print_log("Phase 1: Batch Submission")
     print_log("=" * 70 + "\n")
     
     submit_start_time = time.time()
     submitted_tasks = []
     total_request_time = 0
     
-    # 调整速率限制：每10秒最多5个请求
+    # Adjust rate limit: maximum 5 requests per 10 seconds
     rate_limiter.max_requests = 5
     rate_limiter.time_window = 10
     rate_limiter.request_times.clear()
-    print_log(f"速率限制: {rate_limiter.max_requests}次 / {rate_limiter.time_window}秒")
+    print_log(f"Rate limit: {rate_limiter.max_requests} requests / {rate_limiter.time_window} seconds")
     
-    # 只提交需要运行的任务
+    # Only submit tasks that need to run
     tasks_to_run = []
     for i, data in enumerate(all_data, 1):
         tasks_to_run.append((i, data))
         
-    print_log(f"需要提交的任务数: {len(tasks_to_run)}")
+    print_log(f"Number of tasks to submit: {len(tasks_to_run)}")
 
-    # 使用线程池进行提交
-    # 提交并发数受 rate_limiter 控制，可以设为 5
+    # Use thread pool for submission
+    # Submission concurrency is controlled by rate_limiter, can be set to 5
     with ThreadPoolExecutor(max_workers=5) as executor:
         submit_futures = {
             executor.submit(submit_generation_task, api, idx, data): idx
             for idx, data in tasks_to_run
         }
         
-        with tqdm(total=len(tasks_to_run), desc="提交任务", unit="首") as pbar:
+        with tqdm(total=len(tasks_to_run), desc="Submitting tasks", unit="song") as pbar:
             for future in as_completed(submit_futures):
                 result = future.result()
                 submitted_tasks.append(result)
@@ -609,37 +609,37 @@ def main():
     submit_phase_time = time.time() - submit_start_time
     success_submits = sum(1 for t in submitted_tasks if t['success'])
     
-    # 获取速率限制统计
+    # Get rate limit statistics
     rate_limit_stats = rate_limiter.get_stats()
     
-    print_log(f"\n提交阶段完成: {success_submits}/{len(tasks_to_run)} 成功")
-    print_log(f"  总耗时: {submit_phase_time:.1f} 秒")
-    print_log(f"  实际请求时间: {total_request_time:.2f} 秒")
-    print_log(f"  速率限制等待: {rate_limit_stats['total_wait_time']:.2f} 秒 ({rate_limit_stats['wait_count']} 次)")
+    print_log(f"\nSubmission phase complete: {success_submits}/{len(tasks_to_run)} successful")
+    print_log(f"  Total time: {submit_phase_time:.1f} seconds")
+    print_log(f"  Actual request time: {total_request_time:.2f} seconds")
+    print_log(f"  Rate limit waiting: {rate_limit_stats['total_wait_time']:.2f} seconds ({rate_limit_stats['wait_count']} times)")
     if rate_limit_stats['wait_count'] > 0:
-        print_log(f"  平均等待时间: {rate_limit_stats['avg_wait_time']:.2f} 秒/次")
+        print_log(f"  Average wait time: {rate_limit_stats['avg_wait_time']:.2f} seconds/time")
     
-    # ===== 第二阶段：并行等待和下载 =====
+    # ===== Phase 2: Parallel Waiting and Download =====
     print_log("\n" + "=" * 70)
-    print_log("第二阶段：等待生成并下载")
+    print_log("Phase 2: Wait for Generation and Download")
     print_log("=" * 70 + "\n")
     
     wait_start_time = time.time()
     final_results = []
     
-    # 使用更多线程并行等待（不受速率限制）
+    # Use more threads for parallel waiting (not rate limited)
     with ThreadPoolExecutor(max_workers=20) as executor:
         download_futures = {
             executor.submit(wait_and_download_result, api, task, output_dir): task
             for task in submitted_tasks if task['success']
         }
         
-        # 添加提交失败的任务到结果
+        # Add failed submission tasks to results
         for task in submitted_tasks:
             if not task['success']:
                 final_results.append(task)
         
-        with tqdm(total=len(download_futures), desc="下载结果", unit="首") as pbar:
+        with tqdm(total=len(download_futures), desc="Downloading results", unit="song") as pbar:
             for future in as_completed(download_futures):
                 result = future.result()
                 final_results.append(result)
@@ -647,11 +647,11 @@ def main():
     
     wait_phase_time = time.time() - wait_start_time
     
-    # ===== 详细统计和报告 =====
+    # ===== Detailed Statistics and Report =====
     overall_time = time.time() - overall_start_time
     
     print_log("\n" + "=" * 70)
-    print_log("批量生成完成 - 详细性能报告")
+    print_log("Batch Generation Complete - Detailed Performance Report")
     print_log("=" * 70)
     
     success_count = sum(1 for r in final_results if r.get('success'))
@@ -660,22 +660,22 @@ def main():
     
     successful_results = [r for r in final_results if r.get('success')]
     
-    # 基本统计
-    print_log(f"\n【基本统计】")
-    print_log(f"  总歌曲数: {len(all_data)} 首")
-    print_log(f"  成功: {success_count} 首")
-    print_log(f"  失败: {fail_count} 首")
-    print_log(f"  总轨道数: {total_tracks} 个")
+    # Basic Statistics
+    print_log(f"\n[Basic Statistics]")
+    print_log(f"  Total songs: {len(all_data)}")
+    print_log(f"  Successful: {success_count}")
+    print_log(f"  Failed: {fail_count}")
+    print_log(f"  Total tracks: {total_tracks}")
     if success_count > 0:
         avg_tracks = total_tracks / success_count
-        print_log(f"  平均每首轨道数: {avg_tracks:.2f} 个")
+        print_log(f"  Average tracks per song: {avg_tracks:.2f}")
     
-    # 时间统计
-    print_log(f"\n【时间统计】")
-    print_log(f"  ├── 提交阶段: {submit_phase_time:.1f} 秒")
-    print_log(f"  │   ├── 实际请求时间: {total_request_time:.2f} 秒")
-    print_log(f"  │   └── 速率限制等待: {rate_limit_stats['total_wait_time']:.2f} 秒")
-    print_log(f"  ├── 生成等待阶段: {wait_phase_time:.1f} 秒")
+    # Time Statistics
+    print_log(f"\n[Time Statistics]")
+    print_log(f"  ├── Submission phase: {submit_phase_time:.1f} seconds")
+    print_log(f"  │   ├── Actual request time: {total_request_time:.2f} seconds")
+    print_log(f"  │   └── Rate limit waiting: {rate_limit_stats['total_wait_time']:.2f} seconds")
+    print_log(f"  ├── Generation waiting phase: {wait_phase_time:.1f} seconds")
     
     if successful_results:
         wait_times = [r.get('wait_time', 0) for r in successful_results if 'wait_time' in r]
@@ -685,71 +685,71 @@ def main():
             avg_wait = sum(wait_times) / len(wait_times)
             min_wait = min(wait_times)
             max_wait = max(wait_times)
-            print_log(f"  │   ├── 平均等待时间: {avg_wait:.1f} 秒/首")
-            print_log(f"  │   ├── 最快: {min_wait:.1f} 秒")
-            print_log(f"  │   └── 最慢: {max_wait:.1f} 秒")
+            print_log(f"  │   ├── Average wait time: {avg_wait:.1f} seconds/song")
+            print_log(f"  │   ├── Fastest: {min_wait:.1f} seconds")
+            print_log(f"  │   └── Slowest: {max_wait:.1f} seconds")
         
         if download_times:
             total_download_time = sum(download_times)
             avg_download = total_download_time / len(download_times)
-            print_log(f"  ├── 下载阶段: {total_download_time:.1f} 秒")
-            print_log(f"  │   └── 平均下载时间: {avg_download:.2f} 秒/首")
+            print_log(f"  ├── Download phase: {total_download_time:.1f} seconds")
+            print_log(f"  │   └── Average download time: {avg_download:.2f} seconds/song")
     
-    print_log(f"  └── 总耗时: {overall_time:.1f} 秒 ({overall_time/60:.1f} 分钟)")
+    print_log(f"  └── Total time: {overall_time:.1f} seconds ({overall_time/60:.1f} minutes)")
     
-    # 单首生成统计
+    # Single Song Generation Statistics
     if successful_results:
         total_times = [r.get('total_time', 0) for r in successful_results if 'total_time' in r]
         if total_times:
-            print_log(f"\n【单首生成统计】")
+            print_log(f"\n[Single Song Generation Statistics]")
             avg_time = sum(total_times) / len(total_times)
             min_time = min(total_times)
             max_time = max(total_times)
-            print_log(f"  平均每首总耗时: {avg_time:.1f} 秒")
-            print_log(f"  最快生成: {min_time:.1f} 秒")
-            print_log(f"  最慢生成: {max_time:.1f} 秒")
+            print_log(f"  Average total time per song: {avg_time:.1f} seconds")
+            print_log(f"  Fastest generation: {min_time:.1f} seconds")
+            print_log(f"  Slowest generation: {max_time:.1f} seconds")
     
-    # 下载统计
+    # Download Statistics
     total_download_bytes = sum(r.get('download_bytes', 0) for r in successful_results)
     total_download_count = sum(r.get('download_count', 0) for r in successful_results)
     
     if total_download_bytes > 0:
-        print_log(f"\n【下载统计】")
-        print_log(f"  总下载量: {format_bytes(total_download_bytes)}")
-        print_log(f"  下载文件数: {total_download_count} 个")
-        print_log(f"  平均文件大小: {format_bytes(total_download_bytes / total_download_count)}")
+        print_log(f"\n[Download Statistics]")
+        print_log(f"  Total download: {format_bytes(total_download_bytes)}")
+        print_log(f"  Number of files: {total_download_count}")
+        print_log(f"  Average file size: {format_bytes(total_download_bytes / total_download_count)}")
         
         download_speeds = [r.get('avg_download_speed', 0) for r in successful_results if r.get('avg_download_speed', 0) > 0]
         if download_speeds:
             avg_speed = sum(download_speeds) / len(download_speeds)
-            print_log(f"  平均下载速度: {format_speed(avg_speed)}")
+            print_log(f"  Average download speed: {format_speed(avg_speed)}")
     
-    # 轮询统计
+    # Polling Statistics
     poll_counts = [r.get('poll_count', 0) for r in successful_results if 'poll_count' in r]
     if poll_counts:
         total_polls = sum(poll_counts)
         avg_polls = total_polls / len(poll_counts)
-        print_log(f"\n【轮询统计】")
-        print_log(f"  总轮询次数: {total_polls} 次")
-        print_log(f"  平均每首轮询: {avg_polls:.1f} 次")
+        print_log(f"\n[Polling Statistics]")
+        print_log(f"  Total polling count: {total_polls}")
+        print_log(f"  Average polling per song: {avg_polls:.1f}")
     
-    # 效率分析
-    print_log(f"\n【效率分析】")
+    # Efficiency Analysis
+    print_log(f"\n[Efficiency Analysis]")
     if success_count > 0:
         throughput = success_count / (overall_time / 60)
-        print_log(f"  实际吞吐率: {throughput:.2f} 首/分钟")
+        print_log(f"  Actual throughput: {throughput:.2f} songs/minute")
         
-        # 理论最快时间（假设无速率限制）
+        # Theoretical fastest time (assuming no rate limit)
         if wait_times:
             ideal_time = submit_phase_time - rate_limit_stats['total_wait_time'] + max(wait_times)
             efficiency = (ideal_time / overall_time) * 100
-            print_log(f"  理论最快时间: {ideal_time:.1f} 秒")
-            print_log(f"  并发效率: {efficiency:.1f}%")
+            print_log(f"  Theoretical fastest time: {ideal_time:.1f} seconds")
+            print_log(f"  Concurrency efficiency: {efficiency:.1f}%")
     
-    # 显示失败的歌曲
+    # Show failed songs
     if fail_count > 0:
         print_log("\n" + "=" * 70)
-        print_log("失败的歌曲列表")
+        print_log("Failed Songs List")
         print_log("=" * 70)
         for r in sorted(final_results, key=lambda x: x.get('song_index', 0)):
             if not r.get('success'):
@@ -757,7 +757,7 @@ def main():
                 print_log(f"  [{song_id}] {r.get('error', 'Unknown error')}")
     
     print_log("\n" + "=" * 70)
-    print_log(f"所有文件已保存到: {os.path.abspath(output_dir)}")
+    print_log(f"All files saved to: {os.path.abspath(output_dir)}")
     print_log("=" * 70)
 
 

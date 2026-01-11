@@ -224,57 +224,57 @@ def generate_song(lyrics: str, prompt: str, api_key: str) -> Optional[Dict]:
     return None
 
 def main():
-    """主函数"""
-    # 检查 API 密钥
+    """Main function"""
+    # Check API key
     api_key = os.getenv(API_KEY_ENV)
     if not api_key:
         print(f"Error: Please set environment variable {API_KEY_ENV}")
         print(f"Example: export {API_KEY_ENV}=your_api_key")
         return
     
-    # 加载歌曲数据
+    # Load song data
     json_file = "cleaned_data_no_desc.json"
     if not os.path.exists(json_file):
-        print(f"错误: 找不到文件 {json_file}")
+        print(f"Error: File not found {json_file}")
         return
     
-    print(f"正在加载歌曲数据从 {json_file}...")
+    print(f"Loading song data from {json_file}...")
     songs = load_songs(json_file, MAX_SONGS)
-    print(f"已加载 {len(songs)} 首歌曲")
+    print(f"Loaded {len(songs)} songs")
     
-    # 创建输出目录
+    # Create output directory
     output_dir = Path("generated_songs")
     output_dir.mkdir(exist_ok=True)
     
-    # 保存结果的列表
+    # List to save results
     results = []
     
-    # 处理每首歌曲（串行处理，确保并发为 1）
+    # Process each song (serial processing, ensuring concurrency = 1)
     for idx, song in enumerate(songs, 1):
-        print(f"\n[{idx}/{len(songs)}] 正在处理歌曲...")
+        print(f"\n[{idx}/{len(songs)}] Processing song...")
         print(f"  Description: {song.get('description', 'N/A')[:50]}...")
         
-        # 检查输出文件路径
+        # Check output file path
         output_file = output_dir / f"song_{idx:03d}.json"
         
-        # 检查是否已经处理过
+        # Check if already processed
         if is_song_processed(output_file):
-            print(f"  ⊙ 已处理，跳过")
-            # 从文件加载已处理的结果
+            print(f"  ⊙ Already processed, skipping")
+            # Load processed results from file
             existing_result = load_processed_song(output_file)
             results.append({
                 "index": idx,
                 "status": "already_processed",
                 "output_file": str(output_file)
             })
-            # 已处理的歌曲不需要延迟
+            # Already processed songs don't need delay
             continue
         
         lyrics = song.get('lyrics', '')
         description = song.get('description', '')
         
         if not lyrics or not description:
-            print(f"  跳过: 缺少 lyrics 或 description")
+            print(f"  Skipping: missing lyrics or description")
             results.append({
                 "index": idx,
                 "status": "skipped",
@@ -282,24 +282,24 @@ def main():
             })
             continue
         
-        # 调用 API（串行执行，确保并发为 1）
+        # Call API (serial execution, ensuring concurrency = 1)
         result = generate_song(lyrics, description, api_key)
         
         if result:
             task_id = result.get('id')
             initial_status = result.get('status', '')
-            print(f"  ✓ 任务已创建 (ID: {task_id}, 状态: {initial_status})")
+            print(f"  ✓ Task created (ID: {task_id}, Status: {initial_status})")
             
-            # 如果任务状态不是最终状态，等待任务完成
+            # If task status is not final, wait for task completion
             if initial_status not in ['succeeded', 'failed', 'timeouted', 'cancelled']:
                 final_result = wait_for_task_completion(task_id, api_key)
                 if final_result:
                     result = final_result
                 else:
-                    # 查询超时，使用初始结果
-                    print(f"  ⚠ 使用初始结果（查询超时）")
+                    # Query timeout, use initial result
+                    print(f"  ⚠ Using initial result (query timeout)")
             
-            # 保存单个结果（包含最终状态和 choices）
+            # Save single result (including final status and choices)
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump({
                     "index": idx,
@@ -308,7 +308,7 @@ def main():
                     "task_id": task_id
                 }, f, ensure_ascii=False, indent=2)
             
-            # 检查是否成功完成
+            # Check if successfully completed
             final_status = result.get('status', '')
             if final_status == 'succeeded':
                 results.append({
@@ -327,7 +327,7 @@ def main():
                     "failed_reason": result.get('failed_reason', final_status)
                 })
             else:
-                # 任务还在处理中
+                # Task still processing
                 results.append({
                     "index": idx,
                     "status": "processing",
@@ -336,14 +336,14 @@ def main():
                     "current_status": final_status
                 })
         else:
-            print(f"  ✗ 生成失败")
-            # 保存失败信息，包括原始数据
+            print(f"  ✗ Generation failed")
+            # Save failure information, including original data
             error_file = output_dir / f"song_{idx:03d}_error.json"
             with open(error_file, 'w', encoding='utf-8') as f:
                 json.dump({
                     "index": idx,
                     "original_data": song,
-                    "error": "API调用失败，generate_song返回None",
+                    "error": "API call failed, generate_song returned None",
                     "timestamp": time.time()
                 }, f, ensure_ascii=False, indent=2)
             
@@ -351,15 +351,15 @@ def main():
                 "index": idx,
                 "status": "failed",
                 "error_file": str(error_file),
-                "reason": "API调用失败"
+                "reason": "API call failed"
             })
         
-        # 请求之间的延迟，避免频率限制（确保并发为 1）
+        # Delay between requests to avoid rate limiting (ensuring concurrency = 1)
         if idx < len(songs):
-            print(f"  等待 {REQUEST_DELAY} 秒后处理下一首...")
+            print(f"  Waiting {REQUEST_DELAY} seconds before processing next song...")
             time.sleep(REQUEST_DELAY)
     
-    # 保存汇总结果
+    # Save summary results
     summary_file = output_dir / "summary.json"
     with open(summary_file, 'w', encoding='utf-8') as f:
         json.dump({
@@ -372,18 +372,18 @@ def main():
             "results": results
         }, f, ensure_ascii=False, indent=2)
     
-    # 打印统计信息
+    # Print statistics
     print(f"\n{'='*50}")
-    print(f"处理完成!")
-    print(f"总计: {len(songs)} 首")
-    print(f"成功完成: {sum(1 for r in results if r.get('status') == 'success')} 首")
-    print(f"处理中: {sum(1 for r in results if r.get('status') == 'processing')} 首")
-    print(f"已处理: {sum(1 for r in results if r.get('status') == 'already_processed')} 首")
-    print(f"失败: {sum(1 for r in results if r.get('status') == 'failed')} 首")
-    print(f"跳过: {sum(1 for r in results if r.get('status') == 'skipped')} 首")
-    print(f"结果保存在: {output_dir}/")
-    print(f"汇总文件: {summary_file}")
-    print(f"\n提示: 如果任务还在处理中，可以稍后重新运行脚本查询状态")
+    print(f"Processing complete!")
+    print(f"Total: {len(songs)} songs")
+    print(f"Successfully completed: {sum(1 for r in results if r.get('status') == 'success')} songs")
+    print(f"Processing: {sum(1 for r in results if r.get('status') == 'processing')} songs")
+    print(f"Already processed: {sum(1 for r in results if r.get('status') == 'already_processed')} songs")
+    print(f"Failed: {sum(1 for r in results if r.get('status') == 'failed')} songs")
+    print(f"Skipped: {sum(1 for r in results if r.get('status') == 'skipped')} songs")
+    print(f"Results saved in: {output_dir}/")
+    print(f"Summary file: {summary_file}")
+    print(f"\nTip: If tasks are still processing, you can rerun the script later to check status")
 
 if __name__ == "__main__":
     main()

@@ -20,7 +20,7 @@ import subprocess
 auto_prompt_type = ['Pop', 'R&B', 'Dance', 'Jazz', 'Folk', 'Rock', 'Chinese Style', 'Chinese Tradition', 'Metal', 'Reggae', 'Chinese Opera', 'Auto']
 
 def get_free_gpu() -> int:
-    """返回显存占用最少GPU的id"""
+    """Return the GPU ID with the least memory usage"""
     cmd = "nvidia-smi --query-gpu=index,memory.free --format=csv,noheader,nounits"
     result = subprocess.check_output(cmd.split()).decode().strip().split("\n")
 
@@ -29,7 +29,7 @@ def get_free_gpu() -> int:
         idx, free_mem = line.split(",")
         free_list.append((int(idx), int(free_mem)))  # (GPU id, free memory MiB)
     
-    # 按显存剩余排序
+    # Sort by remaining memory
     free_list.sort(key=lambda x: x[1], reverse=True)
     return free_list[0][0]
 
@@ -84,14 +84,14 @@ class Separator:
 def parse_args():
     parser = argparse.ArgumentParser(description='Song Generation Script')
     
-    # 必需参数
+    # Required parameters
     parser.add_argument('--ckpt_path', type=str, required=True,
                       help='Path to the checkpoint directory containing config.yaml and model.pt')
     parser.add_argument('--input_jsonl', type=str, required=True,
                       help='Path to input JSONL file containing generation tasks')
     parser.add_argument('--save_dir', type=str, required=True,
                       help='Directory to save generated audio files and results')
-    # 可选参数
+    # Optional parameters
     parser.add_argument('--generate_type', type=str, default='mixed',
                       help='Type of generation: "vocal" or "bgm" or "separate" or "mixed" (default: "mixed")')
     parser.add_argument('--use_flash_attn', action='store_true',
@@ -554,7 +554,7 @@ if __name__ == "__main__":
     OmegaConf.register_new_resolver("get_fname", lambda: os.path.splitext(os.path.basename(sys.argv[1]))[0])
     OmegaConf.register_new_resolver("load_yaml", lambda x: list(OmegaConf.load(x)))
     np.random.seed(int(time.time()))
-    # 解析命令行参数
+    # Parse command line arguments
     args = parse_args()
     if torch.cuda.is_available():
         device = torch.cuda.current_device()

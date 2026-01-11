@@ -1,5 +1,5 @@
 """
-将数据转换成ACE-STEP能接受的格式
+Convert data to ACE-STEP acceptable format
 """
 
 import re
@@ -26,11 +26,11 @@ START_STR = "Please generate a song in the following style:"
 END_STR = "\nNext, I will tell you the requirements and lyrics"
 
 def process_tag(content:str) -> str:
-    """段落标签处理"""
-    # 提取标签
+    """Process segment label"""
+    # Extract label
     end = content.find("[desc:")
     tag = content[1:end-1]
-    # 小写 & 去除数字 & 去除括号
+    # Lowercase & remove numbers & remove parentheses
     tag = tag.lower()
     tag = re.sub(r'\d+', '', tag)
     tag = re.sub(r'\([^)]*\)', '', tag).strip()
@@ -39,15 +39,15 @@ def process_tag(content:str) -> str:
     return f"[{tag}]"
 
 def process_lyrics(content:str) -> str:
-    """段落歌词处理"""
-    # 提取歌词
+    """Process segment lyrics"""
+    # Extract lyrics
     start = content.find("[lyrics:\n")
     if start == -1:
         return ""
     end = content.find("][phoneme:")
     lyric = content[start+len("[lyrics:\n"):end]
     
-    # 标点转换
+    # Punctuation conversion
     pattern = r'[,。"，:;&—‘\'.\]\[()?\n-]'
     lyric = re.sub(pattern, '.', lyric)
     while lyric.find("..") != -1:
@@ -57,19 +57,19 @@ def process_lyrics(content:str) -> str:
     return lyric
 
 def random_size() -> str:
-    # 前奏尾奏长度
+    # Intro/outro length
     sizes = ['short', 'medium', 'long']
     return random.choice(sizes)
 
 def process_one(messages:list[dict]):
-    """将一个对话messages处理成输入格式，返回 gt_lyric 和 descriptions"""
-    # 整体风格
+    """Process a conversation messages into input format, return gt_lyric and descriptions"""
+    # Overall style
     style:str = messages[0]['content']
     start = style.find(START_STR)
     end = style.find(END_STR)
     descriptions = style[start+len(START_STR):end]
 
-    # 逐句歌词
+    # Line-by-line lyrics
     start_tag = "intro-" + random_size()
     end_tag = "outro-" + random_size()
     gt_lyric = f"[{start_tag}] ;"
@@ -77,9 +77,9 @@ def process_one(messages:list[dict]):
         if message['role'] == "assistant":
             continue
         content = message['content']
-        # 段落标签
+        # Segment label
         tag = process_tag(content)
-        # 段落歌词
+        # Segment lyrics
         lyric = process_lyrics(content)
         if lyric == "" or tag.startswith("[outro"):
             gt_lyric += f" [{end_tag}]"

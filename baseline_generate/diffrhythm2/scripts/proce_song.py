@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-处理 songs.jsonl，生成对应的 lrc 文件和 jsonl 文件。
+Process songs.jsonl to generate corresponding lrc files and jsonl files.
 """
 
 import json
@@ -20,7 +20,7 @@ STRUCTURE_PATTERN = re.compile(r"^\[[^\]]+\]$")
 
 
 def normalize_structure(tag: str) -> str:
-    """将结构标签转换成目标格式。"""
+    """Convert structure tag to target format."""
     tag_lower = tag.lower()
     if tag_lower.startswith("verse"):
         return "[verse]"
@@ -32,20 +32,20 @@ def normalize_structure(tag: str) -> str:
 
 
 def transform_lyrics(raw_lyrics: str) -> List[str]:
-    """根据需求转换歌词为 LRC 行列表。"""
+    """Convert lyrics to LRC line list according to requirements."""
     lines = ["[start]", "[intro]"]
     for raw_line in raw_lyrics.splitlines():
         line = raw_line.strip()
         if not line:
             continue
 
-        # 结构标签单独处理
+        # Process structure tags separately
         if STRUCTURE_PATTERN.match(line) and not TIMESTAMP_PATTERN.match(line):
             tag_content = line[1:-1].strip()
             lines.append(normalize_structure(tag_content))
             continue
 
-        # 去掉时间戳
+        # Remove timestamps
         text = TIMESTAMP_PATTERN.sub("", line).strip()
         if not text:
             continue

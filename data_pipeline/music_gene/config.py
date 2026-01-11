@@ -1,70 +1,70 @@
 """
-配置文件示例
-复制此文件为 config.py 并填入你的实际配置
+Configuration file example
+Copy this file as config.py and fill in your actual configuration
 """
 
-# ============== API 配置 ==============
+# ============== API Configuration ==============
 
-# Suno API 密钥 (从 https://sunoapi.org 获取)
+# Suno API key (obtain from https://sunoapi.org)
 SUNO_API_KEY = ""
 
-# API 基础 URL (通常不需要修改)
+# API base URL (usually no need to modify)
 SUNO_API_BASE_URL = "https://api.sunoapi.org"
 
-# ============== 生成配置 ==============
+# ============== Generation Configuration ==============
 
-# 默认模型版本
-DEFAULT_MODEL_VERSION = "V5"  # 可选: V3_5, V4, V4_5, V4_5PLUS, V5
+# Default model version
+DEFAULT_MODEL_VERSION = "V5"  # Options: V3_5, V4, V4_5, V4_5PLUS, V5
 
-# 是否启用自定义模式
+# Whether to enable custom mode
 DEFAULT_CUSTOM_MODE = True
 
-# 是否默认生成纯音乐
+# Whether to generate instrumental by default
 DEFAULT_INSTRUMENTAL = False
 
-# ============== 任务配置 ==============
+# ============== Task Configuration ==============
 
-# 最大等待时间 (秒)
+# Maximum wait time (seconds)
 MAX_WAIT_TIME = 300
 
-# 检查间隔 (秒)
+# Check interval (seconds)
 CHECK_INTERVAL = 10
 
-# 重试次数
+# Retry count
 MAX_RETRIES = 3
 
-# ============== 文件配置 ==============
+# ============== File Configuration ==============
 
-# 音乐文件保存目录
+# Music file save directory
 OUTPUT_DIRECTORY = "./generated_music"
 
-# 音频格式
-AUDIO_FORMAT = "mp3"  # 可选: mp3, wav
+# Audio format
+AUDIO_FORMAT = "mp3"  # Options: mp3, wav
 
-# ============== 批量生成配置 ==============
+# ============== Batch Generation Configuration ==============
 
-# 批量生成时的并发数
+# Concurrency for batch generation
 BATCH_CONCURRENCY = 5
 
-# 批量生成的延迟 (秒，避免限流)
+# Batch generation delay (seconds, to avoid rate limiting)
 BATCH_DELAY = 2
 
-# ============== 日志配置 ==============
+# ============== Logging Configuration ==============
 
-# 日志级别
-LOG_LEVEL = "INFO"  # 可选: DEBUG, INFO, WARNING, ERROR
+# Log level
+LOG_LEVEL = "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
 
-# 日志文件路径
+# Log file path
 LOG_FILE = "./suno_api.log"
 
-# 是否输出到控制台
+# Whether to output to console
 LOG_TO_CONSOLE = True
 
-# ============== Webhook 配置 ==============
+# ============== Webhook Configuration ==============
 
-# Webhook 回调 URL (可选)
-WEBHOOK_URL = None  # 例如: "https://your-domain.com/webhook"
+# Webhook callback URL (optional)
+WEBHOOK_URL = None  # Example: "https://your-domain.com/webhook"
 
-# Webhook 密钥 (用于验证回调请求)
+# Webhook secret (for verifying callback requests)
 WEBHOOK_SECRET = None
 

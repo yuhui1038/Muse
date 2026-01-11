@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-source /root/miniconda3/etc/profile.d/conda.sh
-conda activate <conda_env>
+# source /root/miniconda3/etc/profile.d/conda.sh  # Uncomment and modify path if needed
+# conda activate <conda_env>  # Replace <conda_env> with your conda environment name
 
 export NCCL_DEBUG=WARN
 

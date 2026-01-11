@@ -8,21 +8,26 @@ from tqdm import tqdm
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# 设置环境变量
-os.environ["OPENAI_API_KEY"] = ""  # 替换为你的API密钥
-os.environ["OPENAI_BASE_URL"] = "https://chatapi.littlewheat.com/v1"  # 替换为API的URL
+# Set environment variables
+# Note: Set these environment variables before running the script
+# export OPENAI_API_KEY="your-api-key"
+# export OPENAI_BASE_URL="https://api.openai.com/v1"  # or your custom API URL
+if not os.environ.get("OPENAI_API_KEY"):
+    os.environ["OPENAI_API_KEY"] = ""  # Replace with your API key or set via environment variable
+if not os.environ.get("OPENAI_BASE_URL"):
+    os.environ["OPENAI_BASE_URL"] = "https://api.openai.com/v1"  # Replace with API URL or set via environment variable
 
-# 初始化客户端
+# Initialize client
 client = OpenAI()
 
 
 def _extract_lyrics_timestamps(lyrics_text):
     """
-    提取歌词中的时间戳并转换为秒数
+    Extract timestamps from lyrics and convert to seconds
     Args:
-        lyrics_text: 歌词字符串
+        lyrics_text: Lyrics string
     Returns:
-        List[float]: 按顺序排列的时间戳（秒）
+        List[float]: Timestamps in order (seconds)
     """
     if not isinstance(lyrics_text, str):
         return []
@@ -42,25 +47,25 @@ def _extract_lyrics_timestamps(lyrics_text):
 
 def _validate_timestamps(lyrics_text, min_last_timestamp=170, max_interval=35):
     """
-    校验歌词的时间戳是否满足要求
+    Validate if timestamps in lyrics meet requirements
     Args:
-        lyrics_text: 歌词字符串
-        min_last_timestamp: 最后一个时间戳的最小值（秒）
-        max_interval: 最后两个时间戳最大间隔（秒）
+        lyrics_text: Lyrics string
+        min_last_timestamp: Minimum value of last timestamp (seconds)
+        max_interval: Maximum interval between last two timestamps (seconds)
     Returns:
-        bool: 是否通过校验
+        bool: Whether validation passed
     """
     timestamps = _extract_lyrics_timestamps(lyrics_text)
     if len(timestamps) < 2:
-        print("校验失败：时间戳数量少于2个")
+        print("Validation failed: Timestamp count less than 2")
         return False
     last = timestamps[-1]
     second_last = timestamps[-2]
     if last < min_last_timestamp:
-        print(f"校验失败：最后一个时间戳 {last:.2f}s 小于 {min_last_timestamp}s")
+        print(f"Validation failed: Last timestamp {last:.2f}s is less than {min_last_timestamp}s")
         return False
     if last - second_last > max_interval:
-        print(f"校验失败：最后两个时间戳间隔 {last - second_last:.2f}s 大于 {max_interval}s")
+        print(f"Validation failed: Interval between last two timestamps {last - second_last:.2f}s is greater than {max_interval}s")
         return False
     return True
 
@@ -68,15 +73,15 @@ def _validate_timestamps(lyrics_text, min_last_timestamp=170, max_interval=35):
 def chat_gpt(text, model='gpt-4o-mini'):
     while True:
         try:
-            # 调用 OpenAI 的 chat completions 接口
+            # Call OpenAI chat completions API
             completion = client.chat.completions.create(
-                model=model,  # 使用 GPT-4o-mini 模型
+                model=model,  # Use GPT-4o-mini model
                 messages=[
                     {"role": "system", "content": "You are a helpful assistant."},
                     {"role": "user", "content": text}
                 ]
             )
-            # 获取回复内容
+            # Get response content
             if getattr(completion.choices[0].message, 'content', None):
                 content = completion.choices[0].message.content.strip()
                 return content
@@ -88,15 +93,15 @@ def chat_gpt(text, model='gpt-4o-mini'):
 
 
 def chat_gpt_call(text, model='gpt-4o-mini'):
-    # 调用 OpenAI 的 chat completions 接口
+    # Call OpenAI chat completions API
     completion = client.chat.completions.create(
-        model=model,  # 使用 GPT-4o-mini 模型
+        model=model,  # Use GPT-4o-mini model
         messages=[
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": text}
         ]
     )
-    # 获取回复内容
+    # Get response content
     if getattr(completion.choices[0].message, 'content', None):
         content = completion.choices[0].message.content.strip()
         return content
@@ -106,19 +111,19 @@ def chat_gpt_call(text, model='gpt-4o-mini'):
 
 def generate_music_descriptions(all_music_data, index_pool, output_file, file_lock, sample_size=20, model='gpt-4o-mini', max_retries=0):
     """
-    读取音乐数据文件，随机抽取样本，调用GPT生成新的音乐描述和歌词
+    Read music data file, randomly sample, call GPT to generate new music descriptions and lyrics
     
     Args:
-        all_music_data: 所有音乐数据列表
-        index_pool: 索引池对象（线程安全）
-        output_file: 输出的jsonl文件路径
-        file_lock: 文件写入锁
-        sample_size: 随机抽取的样本数量
-        model: 使用的模型名称
-        max_retries: 最大重试次数
+        all_music_data: List of all music data
+        index_pool: Index pool object (thread-safe)
+        output_file: Path to output jsonl file
+        file_lock: File write lock
+        sample_size: Number of samples to randomly extract
+        model: Model name to use
+        max_retries: Maximum retry count
     
     Returns:
-        (used_indices, success_count): 使用的索引列表和成功生成的数量
+        (used_indices, success_count): List of used indices and number of successful generations
     """
     # duration_ranges = [
     #     ("3.00", "3.15", 50), ("3.15", "3.30", 50), ("3.30", "3.45", 60),
@@ -132,16 +137,24 @@ def generate_music_descriptions(all_music_data, index_pool, output_file, file_lo
     selected_range = random.choice(duration_ranges)
     require_length = selected_range[2]
     
-    # 直接转换为时间戳格式（严格对应元组的左右两端）
+    # Directly convert to timestamp format (strictly corresponding to left and right ends of tuple)
     start_timestamp = f"[{selected_range[0].replace('.', ':')}.00]"
     end_timestamp = f"[{selected_range[1].replace('.', ':')}.00]"
     
-    # 生成时长描述
-    start_duration = f"{selected_range[0].replace('.', '分')}秒"
-    end_duration = f"{selected_range[1].replace('.', '分')}秒"
+    # Generate duration description
+    # Convert seconds to minutes and seconds format
+    start_seconds = float(selected_range[0])
+    start_minutes = int(start_seconds // 60)
+    start_secs = int(start_seconds % 60)
+    start_duration = f"{start_minutes}min {start_secs}sec"
     
-    # 生成示例中的随机时间戳（在时间范围内随机生成）
-    # 解析时间字符串为分钟和秒
+    end_seconds = float(selected_range[1])
+    end_minutes = int(end_seconds // 60)
+    end_secs = int(end_seconds % 60)
+    end_duration = f"{end_minutes}min {end_secs}sec"
+    
+    # Generate random timestamps in examples (randomly generated within time range)
+    # Parse time string to minutes and seconds
     start_parts = selected_range[0].split('.')
     end_parts = selected_range[1].split('.')
     
@@ -150,11 +163,11 @@ def generate_music_descriptions(all_music_data, index_pool, output_file, file_lo
     end_minutes = int(end_parts[0])
     end_seconds = int(end_parts[1])
     
-    # 转换为总秒数
+    # Convert to total seconds
     start_total_seconds = start_minutes * 60 + start_seconds
     end_total_seconds = end_minutes * 60 + end_seconds
     
-    # 在范围内随机生成
+    # Randomly generate within range
     example1_seconds = random.randint(start_total_seconds, end_total_seconds)
     example2_seconds = random.randint(start_total_seconds, end_total_seconds)
     
@@ -166,14 +179,14 @@ def generate_music_descriptions(all_music_data, index_pool, output_file, file_lo
     example1_timestamp = f"[{example1_minutes:02d}:{example1_secs:02d}.00]"
     example2_timestamp = f"[{example2_minutes:02d}:{example2_secs:02d}.00]"
     
-    # 从索引池中获取样本索引（线程安全）
+    # Get sample indices from index pool (thread-safe)
     selected_indices = index_pool.get_indices(sample_size)
     if not selected_indices:
         return [], 0
     
     sample_data = [all_music_data[i] for i in selected_indices]
     
-    # 提取所有不重复的style
+    # Extract all unique styles
     styles = []
     for data in sample_data:
         style = data.get('style', '')
@@ -182,12 +195,12 @@ def generate_music_descriptions(all_music_data, index_pool, output_file, file_lo
     
     styles_text = "、".join(styles)
     
-    # 构建示例文本 - 将所有采样数据都纳入（不包含style）
+    # Build example text - include all sampled data (excluding style)
     examples = []
     for i, data in enumerate(sample_data, 1):  
         lyrics_text = " ".join(data.get('lyrics', [])) if isinstance(data.get('lyrics'), list) else data.get('lyrics', '')
         description = data.get('description', '')
-        examples.append(f"示例{i}:\ndescription: {description}\nlyrics: {lyrics_text}")
+        examples.append(f"Example {i}:\ndescription: {description}\nlyrics: {lyrics_text}")
     
     examples_text = "\n\n".join(examples)
 
@@ -273,10 +286,10 @@ Directly return in JSON array format:
   {{"description": "...", "lyrics": "..."}},
   {{"description": "...", "lyrics": "..."}}
 ]"""
-    # 尝试生成，带重试机制
+    # Try to generate with retry mechanism
     for attempt in range(max_retries + 1):
         try:
-            # 调用OpenAI API
+            # Call OpenAI API
             completion = client.chat.completions.create(
                 model=model,
                 messages=[
@@ -287,7 +300,7 @@ Directly return in JSON array format:
                 temperature=1.0,  
             )
             #print(prompt)
-            # 提取所有回答
+            # Extract all responses
             results = []
             filtered_count = 0
             last_content = None
@@ -296,32 +309,32 @@ Directly return in JSON array format:
                 try:
                     content = choice.message.content.strip()
                     last_content = content
-                    print(f"\n=== GPT回复 {i} ===")
+                    print(f"\n=== GPT Response {i} ===")
                     print(content)
                     print("=" * 50)
-                    # 尝试提取JSON内容
+                    # Try to extract JSON content
                     if "```json" in content:
                         content = content.split("```json")[1].split("```")[0].strip()
                     elif "```" in content:
                         content = content.split("```")[1].split("```")[0].strip()
                     
-                    # 清理JSON中的trailing commas（多余的逗号）
-                    # 移除对象/数组最后一个元素后的逗号
+                    # Clean trailing commas in JSON (extra commas)
+                    # Remove commas after last element of object/array
                     content = re.sub(r',(\s*[}\]])', r'\1', content)
                     
-                    # 解析JSON数组
+                    # Parse JSON array
                     result_array = json.loads(content)
                     
-                    # 确保是列表
+                    # Ensure it's a list
                     if isinstance(result_array, list):
-                        # 验证数组中的每个对象
+                        # Validate each object in array
                         for song in result_array:
                             if isinstance(song, dict) and 'description' in song and 'lyrics' in song:
                                 if _validate_timestamps(song.get('lyrics', '')):
                                     results.append(song)
                                 else:
                                     filtered_count += 1
-                    # 如果返回的是单个对象（兼容旧格式）
+                    # If returned a single object (compatibility with old format)
                     elif isinstance(result_array, dict) and 'description' in result_array and 'lyrics' in result_array:
                         if _validate_timestamps(result_array.get('lyrics', '')):
                             results.append(result_array)
@@ -332,35 +345,35 @@ Directly return in JSON array format:
                     continue
             
             if filtered_count:
-                print(f"共有 {filtered_count} 首歌曲因时间戳校验未通过而被过滤")
+                print(f"Total {filtered_count} songs filtered due to timestamp validation failure")
             
-            # 打印解析结果
-            print(f"\n解析完成，results长度: {len(results)}")
-            print(f"results内容: {results}")
+            # Print parsing results
+            print(f"\nParsing complete, results length: {len(results)}")
+            print(f"Results content: {results}")
             print(start_duration, end_duration,example1_timestamp,example2_timestamp,require_length)
             
-            # 如果解析的result长度不为5，将模型的回复content写入test.txt
+            # If parsed result length is not 2, write model response content to test.txt
             if len(results) != 2:
-                print(f"警告：解析结果长度不为2，实际为{len(results)}，将写入test.txt")
+                print(f"Warning: Parsed result length is not 2, actual is {len(results)}, will write to test.txt")
                 with open('test.txt', 'w', encoding='utf-8') as f:
                     if last_content is not None:
                         f.write(last_content)
-                print("已写入test.txt文件")
+                print("Written to test.txt file")
             
-            # 检查是否成功生成了50首（10个回复 * 每个5首）
+            # Check if successfully generated 50 songs (10 responses * 5 each)
             if len(results) >= 50:
-                # 追加保存结果到文件（使用锁保证线程安全）
+                # Append save results to file (use lock to ensure thread safety)
                 with file_lock:
                     with open(output_file, 'a', encoding='utf-8') as f:
-                        for result in results[:50]:  # 只保存前50首
+                        for result in results[:50]:  # Only save first 50 songs
                             f.write(json.dumps(result, ensure_ascii=False) + '\n')
                 
                 return selected_indices, min(len(results), 50)
             elif attempt < max_retries:
-                print(f"只成功解析了 {len(results)}/50 首歌曲，正在重试...")
+                print(f"Only successfully parsed {len(results)}/50 songs, retrying...")
                 time.sleep(2)
             else:
-                # 最后一次尝试，即使不够50首也保存
+                # Last attempt, save even if not 50 songs
                 if len(results) > 0:
                     with file_lock:
                         with open(output_file, 'a', encoding='utf-8') as f:
@@ -370,17 +383,17 @@ Directly return in JSON array format:
                 
         except Exception as e:
             if attempt < max_retries:
-                print(f"生成过程中出现错误: {e}，正在重试...")
+                print(f"Error occurred during generation: {e}, retrying...")
                 time.sleep(2)
             else:
-                print(f"生成失败: {e}")
+                print(f"Generation failed: {e}")
                 return selected_indices, 0
     
     return selected_indices, 0
 
 
 class IndexPool:
-    """线程安全的索引池，支持自动重置"""
+    """Thread-safe index pool with automatic reset support"""
     
     def __init__(self, total_size, selected_file):
         self.total_size = total_size
@@ -388,58 +401,58 @@ class IndexPool:
         self.lock = threading.Lock()
         self.available_indices = []
         self.selected_indices = set()
-        self.reset_count = 0  # 记录重置次数
+        self.reset_count = 0  # Record reset count
         
-        # 从文件加载已选择的索引
+        # Load selected indices from file
         self._load_selected_indices()
-        # 初始化可用索引
+        # Initialize available indices
         self._reset_pool()
     
     def _load_selected_indices(self):
-        """从文件加载已选择的索引"""
+        """Load selected indices from file"""
         if os.path.exists(self.selected_file):
             with open(self.selected_file, 'r', encoding='utf-8') as f:
                 for line in f:
                     self.selected_indices.add(int(line.strip()))
     
     def _reset_pool(self):
-        """重置索引池"""
-        # 计算可用索引
+        """Reset index pool"""
+        # Calculate available indices
         self.available_indices = [i for i in range(self.total_size) if i not in self.selected_indices]
-        random.shuffle(self.available_indices)  # 打乱顺序
+        random.shuffle(self.available_indices)  # Shuffle order
         
         if len(self.available_indices) == 0:
-            # 如果没有可用索引了，说明已经全部使用过，重置selected_indices
+            # If no available indices, all have been used, reset selected_indices
             self.reset_count += 1
-            print(f"\n索引池已用完，第 {self.reset_count} 次重置池子，重新从 {self.total_size} 首歌曲中抽取")
+            print(f"\nIndex pool exhausted, resetting pool for the {self.reset_count}th time, re-selecting from {self.total_size} songs")
             self.selected_indices.clear()
             self.available_indices = list(range(self.total_size))
             random.shuffle(self.available_indices)
     
     def get_indices(self, count):
         """
-        线程安全地获取指定数量的索引
+        Thread-safe get specified number of indices
         
         Args:
-            count: 需要获取的索引数量
+            count: Number of indices needed
             
         Returns:
-            选中的索引列表
+            List of selected indices
         """
         with self.lock:
-            # 检查是否需要重置池子
+            # Check if pool needs to be reset
             if len(self.available_indices) < count:
                 self._reset_pool()
             
-            # 获取索引
+            # Get indices
             selected = self.available_indices[:count]
             self.available_indices = self.available_indices[count:]
             
-            # 添加到已选择集合
+            # Add to selected set
             for idx in selected:
                 self.selected_indices.add(idx)
             
-            # 写入文件
+            # Write to file
             with open(self.selected_file, 'a', encoding='utf-8') as f:
                 for idx in selected:
                     f.write(f"{idx}\n")
@@ -447,7 +460,7 @@ class IndexPool:
             return selected
     
     def get_stats(self):
-        """获取统计信息"""
+        """Get statistics"""
         with self.lock:
             return {
                 'available': len(self.available_indices),
@@ -458,46 +471,46 @@ class IndexPool:
 
 def batch_generate_music(input_file, output_file, selected_file, total_songs=1000, sample_size=20, model='gpt-4o-mini', num_threads=10):
     """
-    批量生成音乐描述和歌词（多线程版本）
+    Batch generate music descriptions and lyrics (multi-threaded version)
     
     Args:
-        input_file: 输入的jsonl文件路径
-        output_file: 输出的jsonl文件路径
-        selected_file: 记录已选择索引的文件路径
-        total_songs: 总共需要生成的歌曲数量
-        sample_size: 每次抽取的样本数量
-        model: 使用的模型名称
-        num_threads: 线程数量
+        input_file: Path to input jsonl file
+        output_file: Path to output jsonl file
+        selected_file: Path to file recording selected indices
+        total_songs: Total number of songs to generate
+        sample_size: Number of samples to extract each time
+        model: Model name to use
+        num_threads: Number of threads
     """
-    # 读取所有音乐数据
-    print("正在加载音乐数据...")
+    # Load all music data
+    print("Loading music data...")
     all_music_data = []
     with open(input_file, 'r', encoding='utf-8') as f:
         for line in f:
             data = json.loads(line.strip())
             all_music_data.append(data)
-    print(f"共加载了 {len(all_music_data)} 首歌曲")
+    print(f"Loaded {len(all_music_data)} songs")
     
-    # 创建线程安全的索引池
+    # Create thread-safe index pool
     index_pool = IndexPool(len(all_music_data), selected_file)
     stats = index_pool.get_stats()
-    print(f"当前已选择的索引数量: {stats['selected']}")
-    print(f"当前可用的索引数量: {stats['available']}")
+    print(f"Currently selected indices: {stats['selected']}")
+    print(f"Currently available indices: {stats['available']}")
     
-    # 计算需要调用的次数（每次生成5首）
-    num_iterations = (total_songs + 1) // 2  # 向上取整
-    print(f"需要调用 {num_iterations} 次，生成约 {total_songs} 首歌曲（每次5首）")
-    print(f"使用 {num_threads} 个线程并行处理\n")
+    # Calculate number of calls needed (5 songs per call)
+    num_iterations = (total_songs + 1) // 2  # Round up
+    print(f"Need to call {num_iterations} times to generate approximately {total_songs} songs (5 per call)")
+    print(f"Using {num_threads} threads for parallel processing\n")
     
-    # 创建文件写入锁
+    # Create file write lock
     file_lock = threading.Lock()
     
-    # 统计信息
+    # Statistics
     total_generated = 0
     generated_lock = threading.Lock()
     
     def worker_task(task_id):
-        """工作线程任务"""
+        """Worker thread task"""
         try:
             used_indices, success_count = generate_music_descriptions(
                 all_music_data=all_music_data,
@@ -506,52 +519,52 @@ def batch_generate_music(input_file, output_file, selected_file, total_songs=100
                 file_lock=file_lock,
                 sample_size=sample_size,
                 model=model,
-                max_retries=0  # 重试
+                max_retries=0  # Retry
             )
             return success_count
         except Exception as e:
-            print(f"任务 {task_id} 失败: {e}")
+            print(f"Task {task_id} failed: {e}")
             return 0
     
-    # 使用线程池和进度条
+    # Use thread pool and progress bar
     with ThreadPoolExecutor(max_workers=num_threads) as executor:
-        # 提交所有任务
+        # Submit all tasks
         futures = {executor.submit(worker_task, i): i for i in range(num_iterations)}
         
-        # 使用tqdm显示进度
-        with tqdm(total=num_iterations, desc="生成进度", unit="批次") as pbar:
+        # Use tqdm to show progress
+        with tqdm(total=num_iterations, desc="Generation progress", unit="batch") as pbar:
             for future in as_completed(futures):
                 success_count = future.result()
                 
                 with generated_lock:
                     total_generated += success_count
                 
-                # 获取当前统计信息
+                # Get current statistics
                 stats = index_pool.get_stats()
                 
-                # 更新进度条
+                # Update progress bar
                 pbar.set_postfix({
-                    '本批次': f'{success_count}/5',
-                    '累计': total_generated,
-                    '剩余索引': stats['available'],
-                    '重置次数': stats['reset_count']
+                    'Batch': f'{success_count}/5',
+                    'Total': total_generated,
+                    'Remaining': stats['available'],
+                    'Resets': stats['reset_count']
                 })
                 pbar.update(1)
     
-    # 最终统计
+    # Final statistics
     stats = index_pool.get_stats()
-    print(f"\n生成完成！")
-    print(f"总共生成了 {total_generated} 首歌曲")
-    print(f"使用了 {stats['selected']} 个索引")
-    print(f"剩余可用索引: {stats['available']}")
-    print(f"池子重置次数: {stats['reset_count']}")
+    print(f"\nGeneration complete!")
+    print(f"Total generated: {total_generated} songs")
+    print(f"Used {stats['selected']} indices")
+    print(f"Remaining available indices: {stats['available']}")
+    print(f"Pool reset count: {stats['reset_count']}")
 
 
 if __name__ == '__main__':
     input_file = 'tagged_musics.jsonl'
     output_file = 'generate_en_lrc.jsonl'
     selected_file = 'selected.txt'
-    #n=1, max_retries=0，每次采样10首，生成5首新歌曲
+    # n=1, max_retries=0, sample 10 songs each time, generate 5 new songs
     batch_generate_music(
         input_file=input_file,
         output_file=output_file,
@@ -559,8 +572,6 @@ if __name__ == '__main__':
         total_songs=100,
         sample_size=4,
         model='gpt-4o-mini',
-        num_threads=20  # 先用1个线程测试
+        num_threads=20  # Test with 1 thread first
     )
-    #model='gemini-2.5-pro-preview-06-05'
-    #3.30~3.45、4.30-4.45
-    #txt追加写
+    # Append to txt file

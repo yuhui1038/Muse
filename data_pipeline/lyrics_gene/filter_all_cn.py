@@ -8,33 +8,33 @@ from tqdm import tqdm
 # os.environ["HTTP_PROXY"] = "http://127.0.0.1:7890"
 # os.environ["HTTPS_PROXY"] = "http://127.0.0.1:7890"
 
-# 使用 HuggingFace 镜像站
+# Use HuggingFace mirror site
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-# 设置 HuggingFace 缓存目录，让 SentenceTransformer 能够识别已下载的模型
+# Set HuggingFace cache directory so SentenceTransformer can recognize downloaded models
 os.environ["HF_HOME"] = os.path.expanduser("~/.cache/huggingface")
 
 
 def clean_lyrics(lyrics):
     """
-    清理歌词，去除段落标签、时间戳标签和换行符，只保留纯歌词文本
+    Clean lyrics by removing segment tags, timestamp tags, and newlines, keeping only pure lyric text
     
     Args:
-        lyrics: 原始歌词文本（包含段落标签如[Verse 1]、时间戳如[00:07.00]和换行符）
+        lyrics: Raw lyrics text (contains segment tags like [Verse 1], timestamps like [00:07.00], and newlines)
         
     Returns:
-        清理后的歌词文本（纯文本，无标签和换行符）
+        Cleaned lyrics text (plain text, no tags and newlines)
     """
-    # 使用正则表达式移除所有 [标签] 格式的内容（包括段落标签和时间戳）
-    # 匹配 [任意内容] 的模式
+    # Use regex to remove all [tag] format content (including segment tags and timestamps)
+    # Pattern matching [any content]
     cleaned = re.sub(r'\[.*?\]', '', lyrics)
     
-    # 去除所有换行符，替换为空格
+    # Remove all newlines, replace with spaces
     cleaned = cleaned.replace('\n', ' ')
     
-    # 去除多余的空格（将多个连续空格替换为单个空格）
+    # Remove extra spaces (replace multiple consecutive spaces with single space)
     cleaned = re.sub(r'\s+', ' ', cleaned)
     
-    # 去除首尾空格
+    # Remove leading and trailing spaces
     cleaned = cleaned.strip()
     
     return cleaned
@@ -42,74 +42,74 @@ def clean_lyrics(lyrics):
 
 def load_music_data(input_file, max_count=None):
     """
-    从jsonl文件加载音乐数据
+    Load music data from jsonl file
     
     Args:
-        input_file: 输入的jsonl文件路径
-        max_count: 最大读取数量，None表示读取全部
+        input_file: Path to input jsonl file
+        max_count: Maximum number to read, None means read all
         
     Returns:
-        音乐数据列表
+        List of music data
     """
     music_list = []
-    print(f"正在加载音乐数据: {input_file}")
+    print(f"Loading music data: {input_file}")
     if max_count:
-        print(f"限制读取前 {max_count} 首歌曲")
+        print(f"Limiting to first {max_count} songs")
     
     with open(input_file, 'r', encoding='utf-8') as f:
-        for line in tqdm(f, desc="加载数据"):
+        for line in tqdm(f, desc="Loading data"):
             try:
                 data = json.loads(line.strip())
-                # 确保包含必需字段
+                # Ensure required fields are present
                 if 'description' in data and 'lyrics' in data:
                     music_list.append(data)
-                    # 如果达到最大数量，停止读取
+                    # If reached maximum count, stop reading
                     if max_count and len(music_list) >= max_count:
                         break
             except json.JSONDecodeError:
                 continue
-    print(f"成功加载 {len(music_list)} 首歌曲")
+    print(f"Successfully loaded {len(music_list)} songs")
     return music_list
 
 
 def deduplicate_music(music_list, texts, model, threshold=0.90, output_file=None, save_interval=10000, matrix_save_dir=None):
     """
-    基于文本相似度对音乐数据进行去重
+    Deduplicate music data based on text similarity
     
     Args:
-        music_list: 音乐数据列表
-        texts: 用于比较的文本列表
-        model: SentenceTransformer模型
-        threshold: 相似度阈值
-        output_file: 输出文件路径，如果提供则支持增量保存
-        save_interval: 每处理多少首有效歌曲保存一次
-        matrix_save_dir: 矩阵保存目录
+        music_list: List of music data
+        texts: List of texts for comparison
+        model: SentenceTransformer model
+        threshold: Similarity threshold
+        output_file: Output file path, if provided supports incremental saving
+        save_interval: Save every N valid songs processed
+        matrix_save_dir: Directory to save matrices
         
     Returns:
-        去重后的音乐数据列表
+        Deduplicated music data list
     """
-    print(f"正在计算 {len(texts)} 个文本的embeddings...")
+    print(f"Computing embeddings for {len(texts)} texts...")
     embeddings = model.encode(texts, convert_to_tensor=True, show_progress_bar=True)
     
-    print("正在计算相似度矩阵...")
+    print("Computing similarity matrix...")
     cos_scores = util.pytorch_cos_sim(embeddings, embeddings)
     
-    # 保存相似度矩阵和embeddings
+    # Save similarity matrix and embeddings
     if matrix_save_dir:
         os.makedirs(matrix_save_dir, exist_ok=True)
         embeddings_path = os.path.join(matrix_save_dir, 'embeddings.pt')
         cos_scores_path = os.path.join(matrix_save_dir, 'cos_scores.pt')
-        print(f"正在保存embeddings到: {embeddings_path}")
+        print(f"Saving embeddings to: {embeddings_path}")
         torch.save(embeddings.cpu(), embeddings_path)
-        print(f"正在保存相似度矩阵到: {cos_scores_path}")
+        print(f"Saving similarity matrix to: {cos_scores_path}")
         torch.save(cos_scores.cpu(), cos_scores_path)
-        print("矩阵保存完成！")
+        print("Matrix saving complete!")
     
-    print(f"正在去重（阈值: {threshold}）...")
+    print(f"Deduplicating (threshold: {threshold})...")
     keep_idx = []
     removed = set()
     
-    # 如果提供了输出文件，以追加模式打开
+    # If output file provided, open in write mode
     f = None
     if output_file:
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
@@ -117,92 +117,92 @@ def deduplicate_music(music_list, texts, model, threshold=0.90, output_file=None
     
     saved_count = 0
     
-    for i in tqdm(range(len(music_list)), desc="去重进度"):
+    for i in tqdm(range(len(music_list)), desc="Deduplication progress"):
         if i in removed:
             continue
         keep_idx.append(i)
         
-        # 如果启用增量保存，每累积save_interval首就保存一次
+        # If incremental saving enabled, save every save_interval songs
         if f and len(keep_idx) - saved_count >= save_interval:
-            # 保存从saved_count到当前的所有有效歌曲
+            # Save all valid songs from saved_count to current
             for idx in range(saved_count, len(keep_idx)):
                 music = music_list[keep_idx[idx]]
                 f.write(json.dumps(music, ensure_ascii=False) + '\n')
-            f.flush()  # 确保写入磁盘
+            f.flush()  # Ensure write to disk
             saved_count = len(keep_idx)
-            print(f"已保存 {saved_count} 首有效歌曲到文件")
+            print(f"Saved {saved_count} valid songs to file")
         
         for j in range(i+1, len(music_list)):
             if cos_scores[i][j] > threshold:
                 removed.add(j)
     
-    # 保存剩余的有效歌曲
+    # Save remaining valid songs
     if f:
         for idx in range(saved_count, len(keep_idx)):
             music = music_list[keep_idx[idx]]
             f.write(json.dumps(music, ensure_ascii=False) + '\n')
         f.close()
-        print(f"已保存所有 {len(keep_idx)} 首有效歌曲到文件")
+        print(f"Saved all {len(keep_idx)} valid songs to file")
     
     deduped_music_list = [music_list[i] for i in keep_idx]
-    print(f"去重完成: {len(music_list)} -> {len(deduped_music_list)} (移除了 {len(removed)} 首)")
+    print(f"Deduplication complete: {len(music_list)} -> {len(deduped_music_list)} (removed {len(removed)} songs)")
     
     return deduped_music_list
 
 
 def dedup_by_description_and_lyrics(input_file, output_file, threshold=0.95, max_count=None, device='cuda:1', save_interval=10000, matrix_save_dir=None):
     """
-    方式2：基于description + lyrics进行去重
+    Method 2: Deduplicate based on description + lyrics
     
     Args:
-        input_file: 输入的jsonl文件路径
-        output_file: 输出的jsonl文件路径
-        threshold: 相似度阈值
-        max_count: 最大读取数量，None表示读取全部
-        device: 使用的设备，默认cuda:1（GPU1）
-        save_interval: 每处理多少首有效歌曲保存一次，默认10000
-        matrix_save_dir: 矩阵保存目录，如果提供则保存embeddings和相似度矩阵
+        input_file: Path to input jsonl file
+        output_file: Path to output jsonl file
+        threshold: Similarity threshold
+        max_count: Maximum number to read, None means read all
+        device: Device to use, default cuda:1 (GPU1)
+        save_interval: Save every N valid songs processed, default 10000
+        matrix_save_dir: Directory to save matrices, if provided saves embeddings and similarity matrix
     """
-    print("\n========== 方式2：基于description + lyrics去重 ==========")
-    print(f"使用设备: {device}")
+    print("\n========== Method 2: Deduplicate based on description + lyrics ==========")
+    print(f"Using device: {device}")
     
-    # 加载数据
+    # Load data
     music_list = load_music_data(input_file, max_count=max_count)
     
-    # 提取description + lyrics的组合文本
+    # Extract combined text from description + lyrics
     combined_texts = []
     for music in music_list:
         description = music.get('description', '')
         lyrics = music.get('lyrics', '')
-        # 清理lyrics，去除结构标签
+        # Clean lyrics, remove structure tags
         cleaned_lyrics = clean_lyrics(lyrics)
-        # 将description和清理后的lyrics拼接（用分隔符隔开）
+        # Concatenate description and cleaned lyrics (separated by delimiter)
         combined_text = f"{description} [SEP] {cleaned_lyrics}"
         combined_texts.append(combined_text)
     
-    # 加载中文模型并指定设备
-    # 检查本地是否已有模型，如果有则直接使用本地路径，避免重新下载
+    # Load Chinese model and specify device
+    # Check if local model exists, if so use local path directly to avoid re-downloading
     hf_home = os.environ.get("HF_HOME", os.path.expanduser("~/.cache/huggingface"))
     model_cache_dir = os.path.join(hf_home, "hub", "models--shibing624--text2vec-bge-large-chinese", "snapshots")
     
-    # 查找模型快照目录
+    # Find model snapshot directory
     local_model_path = None
     if os.path.exists(model_cache_dir):
         snapshots = [d for d in os.listdir(model_cache_dir) if os.path.isdir(os.path.join(model_cache_dir, d))]
         if snapshots:
-            # 使用最新的快照（通常是唯一的）
+            # Use latest snapshot (usually unique)
             local_model_path = os.path.join(model_cache_dir, snapshots[0])
             if os.path.exists(os.path.join(local_model_path, "config.json")):
-                print(f"检测到本地模型，使用路径: {local_model_path}")
+                print(f"Detected local model, using path: {local_model_path}")
                 model = SentenceTransformer(local_model_path, device=device)
             else:
                 local_model_path = None
     
     if local_model_path is None:
-        print(f"正在加载模型到 {device}...")
+        print(f"Loading model to {device}...")
         model = SentenceTransformer('shibing624/text2vec-bge-large-chinese', device=device)
     
-    # 去重（支持增量保存）
+    # Deduplicate (supports incremental saving)
     deduped_music_list = deduplicate_music(
         music_list, 
         combined_texts, 
@@ -213,59 +213,59 @@ def dedup_by_description_and_lyrics(input_file, output_file, threshold=0.95, max
         matrix_save_dir=matrix_save_dir
     )
     
-    # 去重函数已经处理了保存，这里只需要打印信息
+    # Deduplication function already handled saving, just print info here
     if output_file:
-        print(f"✓ 保存完成！去重后剩余 {len(deduped_music_list)} 首歌曲\n")
+        print(f"✓ Save complete! Remaining {len(deduped_music_list)} songs after deduplication\n")
     else:
-        # 如果没有提供输出文件，这里保存一次（兼容旧代码）
-        print(f"正在保存结果到: {output_file}")
+        # If no output file provided, save once here (compatibility with old code)
+        print(f"Saving results to: {output_file}")
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
         with open(output_file, 'w', encoding='utf-8') as f:
             for music in deduped_music_list:
                 f.write(json.dumps(music, ensure_ascii=False) + '\n')
-        print(f"✓ 保存完成！去重后剩余 {len(deduped_music_list)} 首歌曲\n")
+        print(f"✓ Save complete! Remaining {len(deduped_music_list)} songs after deduplication\n")
     
     return deduped_music_list
 
 
 if __name__ == '__main__':
-    # 输入文件路径
+    # Input file path
     input_file = 'lrc_4w_single_pro_des.jsonl'
     
-    # 输出文件路径
+    # Output file path
     output_file = 'filter_all_4w.jsonl'
     
-    # 矩阵保存目录
+    # Matrix save directory
     matrix_save_dir = 'generate_lrc'
     
-    # # 设置最大读取数量（用于测试，None表示读取全部）
-    max_count = None  # 先测试前5首
+    # Set maximum read count (for testing, None means read all)
+    max_count = None  # Test first 5 songs
         
-    #基于description + lyrics去重（暂时注释）
-    print("\n基于description + lyrics去重")
+    # Deduplicate based on description + lyrics
+    print("\nDeduplicating based on description + lyrics")
     dedup_by_description_and_lyrics(
         input_file, 
         output_file, 
         threshold=0.90, 
         max_count=max_count, 
         device='cuda:7',
-        save_interval=10000,  # 每10000首有效歌曲保存一次
-        matrix_save_dir=matrix_save_dir  # 保存相似度矩阵
+        save_interval=10000,  # Save every 10000 valid songs
+        matrix_save_dir=matrix_save_dir  # Save similarity matrix
     )
-    print(f"\n完成！结果保存在: {output_file}")
-    print(f"相似度矩阵保存在: {matrix_save_dir}")
-    # 测试清理歌词效果
-    # print("\n========== 测试歌词效果 ==========")
+    print(f"\nComplete! Results saved to: {output_file}")
+    print(f"Similarity matrix saved to: {matrix_save_dir}")
+    # Test lyrics cleaning effect
+    # print("\n========== Test Lyrics Cleaning Effect ==========")
     # music_list = load_music_data(input_file, max_count=max_count)
     
     # print("\n" + "="*80)
     # for i, music in enumerate(music_list, 1):
-    #     print(f"\n【第 {i} 首歌曲】")
+    #     print(f"\n[Song {i}]")
     #     print(f"Description: {music.get('description', '')}")
-    #     print("\n--- 原始歌词 ---")
+    #     print("\n--- Original Lyrics ---")
     #     original_lyrics = music.get('lyrics', '')
     #     print(original_lyrics[:500] + "..." if len(original_lyrics) > 500 else original_lyrics)
-    #     print("\n--- 清理后的歌词 ---")
+    #     print("\n--- Cleaned Lyrics ---")
     #     cleaned_lyrics = clean_lyrics(original_lyrics)
     #     print(cleaned_lyrics)
     #     print("\n" + "-"*80)

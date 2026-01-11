@@ -3,142 +3,142 @@ import os
 
 def extract_user_prompt(messages):
     """
-    从messages列表中提取所有role为user的content，并进行拼接
-    在拼接每个content时，检查拼接后prompt长度是否大于1600，
-    若大于则不拼接并且不看后续片段，保证段落完整
+    Extract all content from messages where role is user, and concatenate them
+    When concatenating each content, check if the concatenated prompt length exceeds 1600,
+    if so, do not concatenate and skip subsequent segments to ensure paragraph integrity
     
     Args:
-        messages: 字典列表，每个字典包含role和content字段
+        messages: List of dictionaries, each containing role and content fields
         
     Returns:
-        拼接后的prompt字符串
+        Concatenated prompt string
     """
-    # 收集所有user消息的content，但需要检查长度限制
+    # Collect all user message content, but need to check length limit
     user_contents = []
-    current_length = 0  # 当前已拼接的长度
+    current_length = 0  # Current concatenated length
     
     for msg in messages:
         if msg.get("role") == "user":
             content = msg.get("content", "")
             if content:
-                # 计算如果加上这个content后的总长度
-                # 需要考虑换行符：如果已有内容，需要加一个换行符
+                # Calculate total length if this content is added
+                # Need to consider newline: if content already exists, need to add a newline
                 if user_contents:
-                    # 已有内容，需要加上换行符和当前content
-                    new_length = current_length + 1 + len(content)  # 1是换行符的长度
+                    # Content already exists, need to add newline and current content
+                    new_length = current_length + 1 + len(content)  # 1 is newline length
                 else:
-                    # 第一个content，不需要换行符
+                    # First content, no newline needed
                     new_length = len(content)
                 
-                # 如果加上这个content后不超过1600，则添加
+                # If adding this content doesn't exceed 1600, add it
                 if new_length <= 1600:
                     user_contents.append(content)
                     current_length = new_length
                 else:
-                    # 超过1600，不添加这个content，并且停止处理后续片段
+                    # Exceeds 1600, don't add this content and stop processing subsequent segments
                     break
     
-    # 将所有content用换行符拼接
+    # Concatenate all content with newlines
     if user_contents:
         prompt = "\n".join(user_contents)
         return prompt
     
-    # 如果没有找到user消息，返回空字符串
+    # If no user message found, return empty string
     return ""
 
 def update_song_file(file_path, new_prompt):
     """
-    更新song文件中的style_prompt字段
+    Update style_prompt field in song file
     
     Args:
-        file_path: song文件的路径
-        new_prompt: 新的prompt内容
+        file_path: Path to song file
+        new_prompt: New prompt content
     """
-    # 读取文件内容
+    # Read file content
     with open(file_path, 'r', encoding='utf-8') as f:
         lines = [line.strip() for line in f if line.strip()]
     
     if not lines:
-        print(f"  警告: 文件 {file_path} 为空，跳过")
+        print(f"  Warning: File {file_path} is empty, skipping")
         return
     
-    # 读取第一条JSON数据
+    # Read first JSON data
     try:
         data = json.loads(lines[0])
-        # 更新style_prompt字段
+        # Update style_prompt field
         data['style_prompt'] = new_prompt
         
-        # 写回文件
+        # Write back to file
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(json.dumps(data, ensure_ascii=False) + '\n')
-            # 如果有第二行空行，保留
+            # If there's a second empty line, keep it
             if len(lines) > 1:
                 f.write('\n')
         
-        print(f"  ✓ 已更新 {file_path}")
+        print(f"  ✓ Updated {file_path}")
     except json.JSONDecodeError as e:
-        print(f"  错误: 解析JSON失败 {file_path}: {e}")
+        print(f"  Error: JSON parsing failed {file_path}: {e}")
     except Exception as e:
-        print(f"  错误: 更新文件失败 {file_path}: {e}")
+        print(f"  Error: Failed to update file {file_path}: {e}")
 
 def main():
-    # 文件路径
+    # File paths
     input_file = "xxx/diffrhythm2/scripts/test_messages.jsonl"
     zh_songs_dir = "xxx/diffrhythm2/example/zh_songs"
     en_songs_dir = "xxx/diffrhythm2/example/en_songs"
     
-    print(f"正在读取文件: {input_file}")
+    print(f"Reading file: {input_file}")
     
-    # 读取所有数据
+    # Read all data
     with open(input_file, 'r', encoding='utf-8') as f:
         lines = [line.strip() for line in f if line.strip()]
     
-    print(f"共读取到 {len(lines)} 条数据")
+    print(f"Read {len(lines)} entries")
     
-    # 处理每条数据
+    # Process each entry
     for idx, line in enumerate(lines, 1):
         try:
             data = json.loads(line)
             messages = data.get("messages", [])
             
-            # 提取prompt
+            # Extract prompt
             prompt = extract_user_prompt(messages)
             
             if not prompt:
-                print(f"处理第 {idx} 条数据: 未找到user content，跳过")
+                print(f"Processing entry {idx}: No user content found, skipping")
                 continue
             
-            # 判断是中文还是英文
+            # Determine if Chinese or English
             if idx <= 50:
-                # 前50条：中文歌曲
+                # First 50 entries: Chinese songs
                 song_num = idx
                 target_dir = zh_songs_dir
-                lang = "中文"
+                lang = "Chinese"
             else:
-                # 51-100条：英文歌曲
+                # Entries 51-100: English songs
                 song_num = idx - 50  # 51->1, 52->2, ..., 100->50
                 target_dir = en_songs_dir
-                lang = "英文"
+                lang = "English"
             
-            # 构建文件路径
+            # Build file path
             song_file = os.path.join(target_dir, f"song_{song_num}.jsonl")
             
-            print(f"处理第 {idx} 条数据 ({lang}，song_{song_num})...")
-            print(f"  Prompt长度: {len(prompt)} 字符")
+            print(f"Processing entry {idx} ({lang}, song_{song_num})...")
+            print(f"  Prompt length: {len(prompt)} characters")
             
-            # 更新文件
+            # Update file
             update_song_file(song_file, prompt)
             
         except json.JSONDecodeError as e:
-            print(f"处理第 {idx} 条数据时JSON解析失败: {e}")
+            print(f"JSON parsing failed for entry {idx}: {e}")
             continue
         except Exception as e:
-            print(f"处理第 {idx} 条数据时出错: {e}")
+            print(f"Error processing entry {idx}: {e}")
             import traceback
             traceback.print_exc()
             continue
     
-    print(f"\n处理完成！共处理 {len(lines)} 条数据")
+    print(f"\nProcessing complete! Processed {len(lines)} entries")
 
 if __name__ == "__main__":
     main()
