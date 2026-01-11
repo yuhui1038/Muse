@@ -11,24 +11,24 @@ from demucs.apply import apply_model
 
 
 # ======================
-# 基础配置
+# Basic Configuration
 # ======================
 
 SAMPLE_RATE = 44100
-MAX_DURATION = 5          # 只取前 30 秒
-BATCH_SIZE = 8               # 80G 显存可调到 16~32
-VOCAL_DB_THRESHOLD = -35.0   # 人声存在阈值（经验值）
+MAX_DURATION = 5          # Only take first 30 seconds
+BATCH_SIZE = 8               # Can adjust to 16~32 for 80G GPU memory
+VOCAL_DB_THRESHOLD = -35.0   # Vocal presence threshold (empirical value)
 # DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 DEVICE = "cuda:1"
 
 
 # ======================
-# 音频加载（只前 30s）
+# Audio Loading (first 30s only)
 # ======================
 
 def load_audio_30s(path: str, sr: int = SAMPLE_RATE) -> torch.Tensor:
     """
-    返回 shape: [channels=2, samples]
+    Returns shape: [channels=2, samples]
     """
     y, _ = librosa.load(
         path,
@@ -44,7 +44,7 @@ def load_audio_30s(path: str, sr: int = SAMPLE_RATE) -> torch.Tensor:
 
 
 # ======================
-# dB 计算
+# dB Calculation
 # ======================
 
 def rms_db(wav: torch.Tensor) -> float:
@@ -57,7 +57,7 @@ def rms_db(wav: torch.Tensor) -> float:
 
 
 # ======================
-# Demucs 人声判断
+# Demucs Vocal Detection
 # ======================
 
 class DemucsVocalDetector:
@@ -72,8 +72,8 @@ class DemucsVocalDetector:
     @torch.no_grad()
     def batch_has_vocal(self, audio_paths: List[str]) -> Dict[str, bool]:
         """
-        输入：音频路径列表
-        输出：{path: 是否有人声}
+        Input: List of audio paths
+        Output: {path: whether has vocals}
         """
         results = {}
 
@@ -114,7 +114,7 @@ class DemucsVocalDetector:
             batch,
             SAMPLE_RATE,
             device=DEVICE,
-            split=False,       # 🔥 核心
+            split=False,       # 🔥 Core
             progress=False
         )
 
@@ -128,7 +128,7 @@ class DemucsVocalDetector:
             results[path] = db > VOCAL_DB_THRESHOLD
 
 # ======================
-# 使用示例
+# Usage Example
 # ======================
 
 if __name__ == "__main__":
@@ -138,4 +138,4 @@ if __name__ == "__main__":
     result = detector.batch_has_vocal(audio_list)
 
     for k, v in result.items():
-        print(f"{k}: {'有' if v else '无'}人声")
+        print(f"{k}: {'Has' if v else 'No'} vocals")

@@ -3,7 +3,7 @@ from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 def filter_lang(dataset:list[dict], langs:list[str]) -> list[dict]:
-    """过滤数据集，只留下lang标签为指定语言的"""
+    """Filter dataset, only keep items with lang tag matching specified languages"""
     new_dataset = []
     for ele in tqdm(dataset, desc="Filtering Lang"):
         if 'lang' not in ele or ele['lang'] not in langs :
@@ -13,7 +13,7 @@ def filter_lang(dataset:list[dict], langs:list[str]) -> list[dict]:
     return new_dataset
 
 def _check_duration(ele, lower_bound, upper_bound):
-    """子进程任务：检查音频时长是否在范围内"""
+    """Subprocess task: Check if audio duration is within range"""
     duration = librosa.get_duration(filename=ele['path'])
     if lower_bound != -1 and duration < lower_bound:
         return None
@@ -22,7 +22,7 @@ def _check_duration(ele, lower_bound, upper_bound):
     return ele
 
 def filter_length(dataset:list[dict], lower_bound:int=-1, upper_bound:int=-1, max_worker:int=4) -> list[dict]:
-    """过滤数据集，只留下长度在[lower_bound, upper_bound]之间的，如果设置-1则视为没有其中一边限制"""
+    """Filter dataset, only keep items with length in [lower_bound, upper_bound], if set to -1 then no limit on that side"""
     new_dataset = []
     with ProcessPoolExecutor(max_workers=max_worker) as executor:
         futures = [

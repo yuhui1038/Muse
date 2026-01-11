@@ -9,10 +9,10 @@ from transformers import (
 from qwen_omni_utils import process_mm_info
 from my_tool import get_free_gpu, audio_cut, extract_json, dup_remove, BASE_DIR
 
-# ===== 标签模型和处理器(对外) =====
+# ===== Tag Model and Processor (External) =====
 
 def load_tag_model():
-    """加载标签模型"""
+    """Load tag model"""
     device = f"cuda:{get_free_gpu()}"
     print(f"Using {device}")
     model_name = "Qwen/Qwen3-Omni-30B-A3B-Instruct"
@@ -30,10 +30,10 @@ def load_tag_model():
     )
     return model, processor
 
-# ===== Tag标注 =====
+# ===== Tag Annotation =====
 
 def _format_messages(prompt:str, path:str) -> list[dict]:
-    """构造传入omni的messages"""
+    """Construct messages to pass to omni"""
     messages = [
         {
             "role": "system",
@@ -51,7 +51,7 @@ def _format_messages(prompt:str, path:str) -> list[dict]:
     return messages
 
 def _batch_tagging(model, processor, paths:list[str], prompt:str, mode="random"):
-    """对一批歌曲进行标注"""
+    """Annotate a batch of songs"""
     convs = []
     middle_paths = []
     output_dir = BASE_DIR / "data/temp"
@@ -91,13 +91,13 @@ def _batch_tagging(model, processor, paths:list[str], prompt:str, mode="random")
         )
 
     torch.cuda.empty_cache()
-    # 删除音频切段
+    # Delete audio segments
     for path in middle_paths:
         if os.path.exists(path):
             os.remove(path)
     return gene_texts
 
-# ===== 对外接口 =====
+# ===== External Interface =====
 
 def get_tags_meta(model, processor, dataset:list[dict], prompt:str, bs:int, save_path:str):
     data_num = len(dataset)

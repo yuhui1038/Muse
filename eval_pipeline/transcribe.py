@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 """
-ASR转录: 调用qwen3-asr对音频进行语音识别
-用法: python transcribe.py --input_dir <音频目录> --output <输出文件.jsonl> --api_key <API_KEY>
-需在qwenasr环境运行
+ASR Transcription: Call qwen3-asr for speech recognition on audio files
+Usage: python transcribe.py --input_dir <audio_directory> --output <output_file.jsonl> --api_key <API_KEY>
+Requires qwenasr environment
 """
 import argparse, json, os, re, glob, subprocess, sys
 from tqdm import tqdm
 
-# 导入 API key
+# Import API key
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from api_key import get_key
 
 def extract_idx(filename):
-    """从文件名提取索引（最后一个数字序列）"""
+    """Extract index from filename (last number sequence)"""
     matches = re.findall(r'\d+', os.path.splitext(filename)[0])
     return int(matches[-1]) if matches else None
 
 def transcribe(audio_path, api_key):
-    """调用qwen3-asr并过滤多余输出"""
+    """Call qwen3-asr and filter redundant output"""
     try:
         result = subprocess.run(
             ['qwen3-asr', '-i', audio_path, '-key', api_key],
@@ -25,14 +25,14 @@ def transcribe(audio_path, api_key):
         )
         output = result.stdout.strip()
         
-        # 过滤多余日志
+        # Filter redundant logs
         lines = output.split('\n')
         transcription = ""
         for line in lines:
             line = line.strip()
             if not line:
                 continue
-            # 过滤日志行
+            # Filter log lines
             if any(skip in line for skip in [
                 "Loaded wav duration:", "DETECTED LANGUAGE", "Detected Language:",
                 "FULL TRANSCRIPTION OF", "Wav duration is longer than",
@@ -40,14 +40,14 @@ def transcribe(audio_path, api_key):
                 "status_code", "Throttling.RateQuota"
             ]):
                 continue
-            # 处理 Full Transcription: 前缀
+            # Handle Full Transcription: prefix
             if "Full Transcription:" in line:
                 parts = line.split("Full Transcription:", 1)
                 if len(parts) > 1:
                     line = parts[1].strip()
                 else:
                     continue
-            # 处理 Segmenting done 行
+            # Handle Segmenting done line
             if "Segmenting done, total segments" in line:
                 if "segments:" in line:
                     parts = line.split("segments:", 1)
@@ -66,12 +66,12 @@ def transcribe(audio_path, api_key):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input_dir", required=True, help="音频目录")
-    parser.add_argument("--output", required=True, help="输出转录文件 (jsonl)")
-    parser.add_argument("--api_key", default="", help="API Key (默认从 api_key.py 读取)")
+    parser.add_argument("--input_dir", required=True, help="Audio directory")
+    parser.add_argument("--output", required=True, help="Output transcription file (jsonl)")
+    parser.add_argument("--api_key", default="", help="API Key (default: read from api_key.py)")
     args = parser.parse_args()
     
-    # 获取 API key
+    # Get API key
     api_key = args.api_key if args.api_key else get_key()
     args.api_key = api_key
     

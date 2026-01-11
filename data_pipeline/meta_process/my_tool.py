@@ -11,14 +11,14 @@ from pydub import AudioSegment
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 
-# ===== 宏 =====
+# ===== Macros =====
 
 BASE_DIR = Path(__file__).parent
 
-# ===== 辅助处理 =====
+# ===== Helper Functions =====
 
 def pure_name(path:str):
-    """获取一个路径文件的原名(不带后缀)"""
+    """Get the original name of a file path (without extension)"""
     basename = os.path.basename(path)
     dot_pos = basename.rfind('.')
     if dot_pos == -1:
@@ -26,41 +26,41 @@ def pure_name(path:str):
     return basename[:dot_pos]
 
 def extract_json(text: str) -> tuple[bool, dict]:
-    """从文本中提取并修复JSON数据（增强容错版）
+    """Extract and repair JSON data from text (enhanced error-tolerant version)
     
-    功能：
-    1. 自动识别代码块标记(```json```或```)
-    2. 修复常见JSON错误（引号不匹配、尾随逗号等）
-    3. 支持宽松模式解析
+    Features:
+    1. Automatically identify code block markers (```json``` or ```)
+    2. Fix common JSON errors (mismatched quotes, trailing commas, etc.)
+    3. Support lenient parsing mode
     
-    返回：(是否成功, 解析后的字典)
+    Returns: (success, parsed dictionary)
     """
-    # 预处理：提取可能的JSON内容区域
+    # Preprocessing: extract possible JSON content area
     content = text
     
-    # 情况1：检查```json```代码块
+    # Case 1: Check ```json``` code block
     if '```json' in text:
         start = text.find('```json')
         end = text.find('```', start + 6)
         content = text[start + 6:end].strip()
-    # 情况2：检查普通```代码块
+    # Case 2: Check regular ``` code block
     elif '```' in text:
         start = text.find('```')
         end = text.find('```', start + 3)
         content = text[start + 3:end].strip()
     
-    # 清理内容中的常见干扰项
-    content = re.sub(r'^[^{[]*', '', content)  # 去除JSON前的非结构内容
-    content = re.sub(r'[^}\]]*$', '', content)  # 去除JSON后的非结构内容
+    # Clean common interference items in content
+    content = re.sub(r'^[^{[]*', '', content)  # Remove unstructured content before JSON
+    content = re.sub(r'[^}\]]*$', '', content)  # Remove unstructured content after JSON
     
-    # 尝试标准解析
+    # Try standard parsing
     try:
         json_data = json.loads(content)
         return True, json_data
     except json.JSONDecodeError as e:
         standard_error = e
     
-    # 尝试用json_repair修复
+    # Try to repair with json_repair
     try:
         repaired = json_repair.repair_json(content)
         json_data = json.loads(repaired)
@@ -76,7 +76,7 @@ def path_join(dir, name):
     return os.path.join(dir, name)
 
 def dict_sort_print(dic:dict, value:bool=True, reverse=True):
-    """让一个字典按照值的大小排序后输出"""
+    """Sort a dictionary by value size and output"""
     idx = 1 if value else 0
     sorted_lis = sorted(dic.items(), key=lambda x: x[idx], reverse=reverse)
     sorted_dic = {}
@@ -86,75 +86,75 @@ def dict_sort_print(dic:dict, value:bool=True, reverse=True):
 
 def clean_newlines(text: str) -> str:
     """
-    清理歌词换行：
-    1. 标点符号后的换行保留
-    2. 非标点符号后的换行 → 空格
-    3. 修正英文撇号后的多余空格
-    4. 多余空格合并
-    5. 保留段落结构，保证标点后换行
+    Clean lyric line breaks:
+    1. Keep line breaks after punctuation
+    2. Convert line breaks after non-punctuation → space
+    3. Fix extra spaces after English apostrophes
+    4. Merge redundant spaces
+    5. Preserve paragraph structure, ensure line breaks after punctuation
     """
     if not text:
         return ""
 
     text = text.strip()
 
-    # 先把原来的换行统一为 \n
+    # First unify line breaks to \n
     text = text.replace('\r\n', '\n').replace('\r', '\n')
 
-    # 把非空行合并为一句（先去掉原来的换行）
+    # Merge non-empty lines into one sentence (remove original line breaks first)
     lines = [line.strip() for line in text.split('\n')]
     text = ' '.join(line for line in lines if line)
 
-    # 在句子结尾标点后加换行（中文和英文标点）
+    # Add line break after sentence-ending punctuation (Chinese and English punctuation)
     text = re.sub(r'([.,!?:;，。！？；])\s*', r'\1\n', text)
 
-    # 英文撇号后的空格修正
-    text = re.sub(r"’\s+", "’", text)
+    # Fix spaces after English apostrophes
+    text = re.sub(r"'\s+", "'", text)
 
-    # 合并多余空格
+    # Merge redundant spaces
     text = re.sub(r'[ \t]+', ' ', text)
 
-    # 去掉行首尾空格
+    # Remove leading and trailing spaces from lines
     text = '\n'.join(line.strip() for line in text.split('\n'))
 
     return text.strip()
 
-# ===== 检测工作 =====
+# ===== Detection Functions =====
 def is_ch_char(char:str):
-    """判断单个字符是否为中文汉字"""
+    """Determine if a single character is a Chinese character"""
     if len(char) != 1:
         return False
     
-    # 中文汉字的Unicode范围
-    # 1. 基本汉字：0x4E00-0x9FFF
-    # 2. 扩展A区：0x3400-0x4DBF
-    # 3. 扩展B区：0x20000-0x2A6DF
-    # 4. 扩展C区：0x2A700-0x2B73F
-    # 5. 扩展D区：0x2B740-0x2B81F
-    # 6. 扩展E区：0x2B820-0x2CEAF
+    # Unicode ranges for Chinese characters
+    # 1. Basic Chinese: 0x4E00-0x9FFF
+    # 2. Extension A: 0x3400-0x4DBF
+    # 3. Extension B: 0x20000-0x2A6DF
+    # 4. Extension C: 0x2A700-0x2B73F
+    # 5. Extension D: 0x2B740-0x2B81F
+    # 6. Extension E: 0x2B820-0x2CEAF
     
     code = ord(char)
     
-    # 常用判断（覆盖绝大部分情况）
+    # Common check (covers most cases)
     if 0x4E00 <= code <= 0x9FFF:
         return True
-    # 扩展A区
+    # Extension A
     if 0x3400 <= code <= 0x4DBF:
         return True
-    # 其他扩展区暂不考虑
+    # Other extensions not considered for now
     
     return False
 
-# ===== 文件操作 =====
+# ===== File Operations =====
 
 def load_txt(path:str) -> str:
-    """以纯文本形式加载一个文件"""
+    """Load a file as plain text"""
     with open(path, 'r') as file:
         content = file.read()
     return content
 
 def load_json(path:str):
-    """加载一个JSON文件"""
+    """Load a JSON file"""
     if not os.path.exists(path):
         return {}
     with open(path, 'r') as file:
@@ -162,7 +162,7 @@ def load_json(path:str):
     return data
 
 def load_jsonl(path:str, limit=-1) -> list[dict]:
-    """加载一个JSONL文件"""
+    """Load a JSONL file"""
     data = []
     with open(path, 'r') as file:
         for id, line in tqdm(enumerate(file), desc=f"Loading {path}"):
@@ -172,12 +172,12 @@ def load_jsonl(path:str, limit=-1) -> list[dict]:
     return data
 
 def save_json(data, path:str):
-    """保存一个JSON文件"""
+    """Save a JSON file"""
     with open(path, 'w', encoding='utf-8') as file:
         json.dump(data, file, ensure_ascii=False, indent=4)
 
 def save_jsonl(data:list[dict], path:str, mode='w'):
-    """保存一个JSONL文件"""
+    """Save a JSONL file"""
     with open(path, mode, encoding='utf-8') as file:
         for ele in tqdm(data, desc=f"Saving to {path}"):
             json.dump(ele, file, ensure_ascii=False)
@@ -185,40 +185,40 @@ def save_jsonl(data:list[dict], path:str, mode='w'):
 
 def audio_cut(input_path, mode:str, output_dir:str, segment_length:int=30000):
     """
-    从音频文件中截取指定长度的片段
-    - mode: 切割类型(random / middle)
-    - output_dir: 输出文件夹
-    - segment_length: 分段长度(毫秒)
+    Extract a segment of specified length from an audio file
+    - mode: Cut type (random / middle)
+    - output_dir: Output folder
+    - segment_length: Segment length (milliseconds)
     """
     assert mode in ['random', 'middle']
 
-    # 检查文件是否存在
+    # Check if file exists
     if not os.path.exists(input_path):
         raise FileNotFoundError(f"Audio file not found: {input_path}")
     
-    # 加载音频文件
+    # Load audio file
     audio = AudioSegment.from_file(input_path)
-    audio = audio.set_frame_rate(44100).set_channels(1) # 设置采样率和声道
-    audio_duration = len(audio) # 长度控制
+    audio = audio.set_frame_rate(44100).set_channels(1) # Set sample rate and channels
+    audio_duration = len(audio) # Duration control
     
-    # 如果音频长度小于目标片段长度，使用整个音频
+    # If audio length is less than target segment length, use entire audio
     if audio_duration <= segment_length:
         print(f"Warning: Audio too short ({audio_duration}ms), using full audio: {input_path}")
         segment = audio
     else:
-        # 根据模式计算切片位置
+        # Calculate slice position based on mode
         if mode == "random":
-            # 随机切
+            # Random cut
             max_start = max(0, audio_duration - segment_length)
             start = random.randint(0, max_start)
             end = start + segment_length
         else:
-            # 切中间
+            # Cut from middle
             middle_point = audio_duration // 2
             start = max(0, middle_point - (segment_length // 2))
             end = min(audio_duration, start + segment_length)
             
-            # 如果从中间切会导致超出边界，调整起始位置
+            # If cutting from middle would exceed boundaries, adjust start position
             if end > audio_duration:
                 end = audio_duration
                 start = end - segment_length
@@ -226,31 +226,31 @@ def audio_cut(input_path, mode:str, output_dir:str, segment_length:int=30000):
                 start = 0
                 end = segment_length
         
-        # 确保切片范围有效
+        # Ensure slice range is valid
         start = max(0, min(start, audio_duration))
         end = max(0, min(end, audio_duration))
         
         if start >= end:
             raise ValueError(f"Invalid slice range: start={start}, end={end}, duration={audio_duration}")
         
-        # 执行切片
+        # Execute slice
         segment = audio[start:end]
     
-    # 生成输出路径
+    # Generate output path
     basename = pure_name(input_path)
     output_path = os.path.join(output_dir, f"seg_{basename}.wav")
     
-    # 保存片段
+    # Save segment
     segment.export(
         output_path, 
         format="wav",
-        codec="pcm_s16le",  # 16位小端编码
-        parameters=["-acodec", "pcm_s16le"]  # ffmpeg参数
+        codec="pcm_s16le",  # 16-bit little-endian encoding
+        parameters=["-acodec", "pcm_s16le"]  # ffmpeg parameters
     )
     return output_path
 
 def format_meta(dir:str, show:bool=True) -> list[dict]:
-    """递归获取一个文件夹下所有音频路径(wav / mp3)构建JSONL"""
+    """Recursively get all audio paths (wav / mp3) in a folder and build JSONL"""
     if not os.path.isdir(dir):
         return []
     dataset = []
@@ -272,9 +272,9 @@ def format_meta(dir:str, show:bool=True) -> list[dict]:
 
 def dup_remove(raw_data:list[dict], save_path:str, key:str, seg:str):
     """
-    从数据集中去除已经生成的
-    - key为raw数据集中的主键，save中的外键
-    - seg为目标字段
+    Remove already generated items from dataset
+    - key is the primary key in raw dataset, foreign key in save
+    - seg is the target field
     """
     if not os.path.exists(save_path):
         print(f"Dup num: 0")
@@ -296,11 +296,11 @@ def dup_remove(raw_data:list[dict], save_path:str, key:str, seg:str):
 
 def tar_size_check(data_dir:str, subfixes:list[str], per:int, max_size:int):
     """
-    压缩前确定一块里面可容纳的文件数量(这里假设文件大小均匀)
-    - data_dir: 待压缩文件夹
-    - subfixes: 待压缩文件后缀(如.mp3)
-    - per: 平均多少文件检查一遍
-    - max_size: 最大的限制GB
+    Determine the number of files that can fit in a block before compression (assuming uniform file sizes)
+    - data_dir: Folder to compress
+    - subfixes: File suffixes to compress (e.g., .mp3)
+    - per: Check every N files on average
+    - max_size: Maximum limit in GB
     """
     names = sorted(list(os.listdir(data_dir)))
     count = 0
@@ -327,7 +327,7 @@ def tar_dir(
         mark:str,
         max_workers:int=10,
         ):
-    """分块压缩一个目录下的文件(非递归)"""
+    """Compress files in a directory in chunks (non-recursive)"""
     names = sorted(list(os.listdir(data_dir)))
     file_num = len(names)
     for i in range(0, file_num, group_size):
@@ -368,12 +368,12 @@ def tar_dir(
         pigz_process.wait()
 
         if tar_process.returncode == 0 and pigz_process.returncode == 0:
-            print(f"压缩完成: {save_path}")
+            print(f"Compression completed: {save_path}")
         else:
-            print(f"压缩失败: tar返回码={tar_process.returncode}, pigz返回码={pigz_process.returncode}")
+            print(f"Compression failed: tar return code={tar_process.returncode}, pigz return code={pigz_process.returncode}")
 
 def music_avg_size(dir:str):
-    """音乐平均大小(MB), 长度(s)"""
+    """Average music size (MB), length (s)"""
     dataset = format_meta(dir)
     dataset = dataset[:50]
     size_sum = 0
@@ -388,7 +388,7 @@ def music_avg_size(dir:str):
     return size_avg, length_avg
 
 def get_sample(path:str, save_path:str="tmp.jsonl", num:int=100):
-    """获取一个JSONL文件的100条数据"""
+    """Get N records from a JSONL file"""
     if not os.path.exists(path):
         return
     if path.endswith(".jsonl"):
@@ -402,7 +402,7 @@ def get_sample(path:str, save_path:str="tmp.jsonl", num:int=100):
     save_jsonl(sub_dataset, save_path)
 
 def _get_field_one(path:str, field:str):
-    """处理一个path的数据"""
+    """Process data from one path"""
     with open(path, 'r') as file:
         data = json.load(file)
     new_data = {
@@ -412,7 +412,7 @@ def _get_field_one(path:str, field:str):
     return new_data
 
 def get_field_suno(dir:str, save_path:str, field:str, max_workers:int=8):
-    """从suno的散装json中集中提取出某个字段"""
+    """Extract a specific field from scattered JSON files in suno"""
     paths = []
     for name in tqdm(os.listdir(dir), desc="Getting names"):
         if not name.endswith(".json"):
@@ -430,7 +430,7 @@ def get_field_suno(dir:str, save_path:str, field:str, max_workers:int=8):
                     pbar.update(1)
 
 def find_json(dir:str) -> list[str]:
-    """找出一个文件夹下的JSONL / JSON文件"""
+    """Find JSONL / JSON files in a folder"""
     names = []
     for name in tqdm(os.listdir(dir), desc="Finding JSON/JSONL"):
         if name.endswith(".json") or name.endswith(".jsonl"):
@@ -438,30 +438,30 @@ def find_json(dir:str) -> list[str]:
     return names
 
 def show_dir(dir:str):
-    """展示一个DIR中的所有内容"""
+    """Display all contents in a directory"""
     if not os.path.isdir(dir):
         return
     for name in os.listdir(dir):
         print(name)
 
 def _convert_mp3(path:str, dir:str):
-    """对单个音频做处理"""
+    """Process a single audio file"""
     purename = pure_name(path)
     output_path = os.path.join(dir, purename + ".mp3")
     if os.path.exists(output_path):
-        # 已经完成
+        # Already completed
         return "pass"
     try:
         audio = AudioSegment.from_file(path)
     except Exception:
-        # 读取文件失败
+        # Failed to read file
         print(f"fail to load {path}")
         return "fail"
     audio.export(output_path, format='mp3')
     return "finish"
 
 def convert_mp3(meta_path:str, dir:str, max_workers:int=10):
-    """将指定的所有音频转换成mp3并保存在指定目录"""
+    """Convert all specified audio files to mp3 and save in specified directory"""
     os.makedirs(dir, exist_ok=True)
     dataset = load_jsonl(meta_path)
     pass_num = 0
@@ -478,10 +478,10 @@ def convert_mp3(meta_path:str, dir:str, max_workers:int=10):
                 pbar.update(1)
     print(f"Finish {finish_num}, Pass {pass_num}")
 
-# ===== GPU与模型 =====
+# ===== GPU and Models =====
 
 def get_free_gpu() -> int:
-    """返回显存占用最少GPU的id"""
+    """Return the GPU ID with the least memory usage"""
     cmd = "nvidia-smi --query-gpu=index,memory.free --format=csv,noheader,nounits"
     result = subprocess.check_output(cmd.split()).decode().strip().split("\n")
 
@@ -490,25 +490,25 @@ def get_free_gpu() -> int:
         idx, free_mem = line.split(",")
         free_list.append((int(idx), int(free_mem)))  # (GPU id, free memory MiB)
     
-    # 按显存剩余排序
+    # Sort by remaining memory
     free_list.sort(key=lambda x: x[1], reverse=True)
     return free_list[0][0]
 
-# ===== 数据分析 =====
+# ===== Data Analysis =====
 
 def compose_analyze(dataset:list[dict]):
-    """音乐结构组成统计分析"""
-    # 标签数量
+    """Statistical analysis of music structure composition"""
+    # Label count
     labels = defaultdict(int)
     for ele in tqdm(dataset):
         segments = ele['segments']
         for segment in segments:
             label = segment['label']
             labels[label] += 1
-    print(f"标签数量: {len(labels)}")
+    print(f"Number of labels: {len(labels)}")
     print(dict_sort_print(labels))
 
-    # 不同组合
+    # Different combinations
     label_combs = defaultdict(int)
     for ele in tqdm(dataset):
         segments = ele['segments']
@@ -520,20 +520,20 @@ def compose_analyze(dataset:list[dict]):
             continue
         label_comb = " | ".join(labels)
         label_combs[label_comb] += 1
-    print(f"组合数量: {len(label_combs)}")
+    print(f"Number of combinations: {len(label_combs)}")
     print(dict_sort_print(label_combs))
 
 def _filter_tag(content:str) -> list[str]:
-    """对标签字段进行切分与格式整理"""
+    """Split and format tag fields"""
     tags = []
     raws = re.split(r'[,，.]', content)
     for raw in raws:
-        raw = raw.strip().lower()   # 去空格转小写
+        raw = raw.strip().lower()   # Remove spaces and convert to lowercase
         if raw == "":
             continue
         seg_pos = raw.find(":")
         if seg_pos != -1:
-            # 有冒号只取后面的部分
+            # If colon exists, only take the part after it
             tag = raw[seg_pos+1:].strip()
         else:
             tag = raw
@@ -541,11 +541,11 @@ def _filter_tag(content:str) -> list[str]:
     return tags
 
 def tags_analyze(dataset:list[dict]):
-    """歌曲标签分析"""
+    """Song tag analysis"""
     tag_count = defaultdict(int)
     for ele in tqdm(dataset, desc="Tag analyzing"):
         tags = _filter_tag(ele['style'])
         for tag in tags:
             tag_count[tag] += 1
-    print(f"标签数量: {len(tag_count.keys())}")
+    print(f"Number of tags: {len(tag_count.keys())}")
     print(dict_sort_print(tag_count))

@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-汇总评测结果生成表格
-用法: python summarize.py --results_dir <结果目录> --output <输出文件.md>
-功能:
-  - 汇总所有指标
-  - 中英文分开 + 合并统计
-  - 最高分标粗 (PER最低标粗)
-  - 追加写入历史记录
-  - 生成可视化表格图片
+Summarize evaluation results and generate tables
+Usage: python summarize.py --results_dir <results_directory> --output <output_file.md>
+Features:
+  - Summarize all metrics
+  - Separate Chinese and English + merged statistics
+  - Bold highest scores (bold lowest PER)
+  - Append to history records
+  - Generate visualization table images
 """
 import argparse, json, os
 from collections import defaultdict
@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')
 
-# 指标定义
+# Metric definitions
 METRICS = {
     'songeval': ['Coherence', 'Musicality', 'Memorability', 'Clarity', 'Naturalness'],
     'audiobox': ['CE', 'CU', 'PC', 'PQ', 'Score'],
@@ -28,7 +28,7 @@ METRICS = {
 ALL_METRICS = METRICS['audiobox'] + METRICS['songeval'] + METRICS['mulan_t'] + METRICS['per']
 
 def load_results(results_dir):
-    """加载所有结果"""
+    """Load all results"""
     data = defaultdict(dict)
     
     for metric_type in METRICS:
@@ -50,7 +50,7 @@ def load_results(results_dir):
     return data
 
 def merge_cn_en(data):
-    """合并中英文结果"""
+    """Merge Chinese and English results"""
     merged = {}
     base_models = set()
     
@@ -72,25 +72,25 @@ def merge_cn_en(data):
     return merged
 
 def find_best(data, metric):
-    """找最佳值"""
+    """Find best value"""
     vals = [d.get(metric) for d in data.values() if d.get(metric) is not None]
     if not vals: return None
     return min(vals) if metric == 'PER' else max(vals)
 
 def generate_markdown_table(data, title="Results"):
-    """生成Markdown表格"""
+    """Generate Markdown table"""
     if not data: return ""
     
-    # 找最佳值
+    # Find best values
     best = {m: find_best(data, m) for m in ALL_METRICS}
     
-    # 表头
+    # Table header
     lines = [f"## {title}", ""]
     header = "| Model | " + " | ".join(ALL_METRICS) + " |"
     sep = "| --- | " + " | ".join(["---"] * len(ALL_METRICS)) + " |"
     lines.extend([header, sep])
     
-    # 数据行
+    # Data rows
     for model in sorted(data.keys()):
         row = [model]
         for m in ALL_METRICS:
@@ -107,10 +107,10 @@ def generate_markdown_table(data, title="Results"):
     return "\n".join(lines)
 
 def save_table_image(data, output_path):
-    """生成表格图片"""
+    """Generate table image"""
     if not data: return
     
-    # 准备DataFrame
+    # Prepare DataFrame
     rows = []
     for model in sorted(data.keys()):
         row = {'Model': model}
@@ -120,7 +120,7 @@ def save_table_image(data, output_path):
     
     df = pd.DataFrame(rows)
     
-    # 找最佳值
+    # Find best values
     best_indices = set()
     for col_idx, col in enumerate(ALL_METRICS):
         if col not in df.columns: continue
@@ -132,12 +132,12 @@ def save_table_image(data, output_path):
             if pd.notna(val) and abs(val - best_val) < 1e-9:
                 best_indices.add((row_idx, col_idx + 1))
     
-    # 绘制表格
+    # Draw table
     num_rows, num_cols = len(df), len(df.columns)
     fig, ax = plt.subplots(figsize=(max(15, num_cols * 1.5), max(4, num_rows * 0.5 + 2)))
     ax.axis('off')
     
-    # 准备单元格文本
+    # Prepare cell text
     cell_text = []
     for _, row in df.iterrows():
         row_text = [str(row['Model'])]
@@ -153,7 +153,7 @@ def save_table_image(data, output_path):
     table.set_fontsize(9)
     table.scale(1.0, 1.5)
     
-    # 样式
+    # Styling
     for (row, col), cell in table.get_celld().items():
         if row == 0:
             cell.set_text_props(weight='bold', color='white')
@@ -172,7 +172,7 @@ def save_table_image(data, output_path):
     print(f"Table image: {img_path}")
 
 def append_history(results_dir, data):
-    """追加历史记录"""
+    """Append history records"""
     history_file = os.path.join(results_dir, "history.jsonl")
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
@@ -198,29 +198,29 @@ def main():
     data = load_results(args.results_dir)
     merged = merge_cn_en(data)
     
-    # 合并到data中
+    # Merge into data
     all_data = dict(data)
     all_data.update(merged)
     
-    # 追加历史记录
+    # Append history records
     append_history(args.results_dir, all_data)
     
-    # 生成Markdown表格
+    # Generate Markdown table
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     output = []
-    output.append(f"# Baseline 评测结果汇总")
-    output.append(f"\n**更新时间**: {timestamp}\n")
+    output.append(f"# Baseline Evaluation Results Summary")
+    output.append(f"\n**Update Time**: {timestamp}\n")
     output.append(generate_markdown_table(all_data, "All Results"))
     output.append("")
     
-    # 写入文件
+    # Write to file
     with open(args.output, 'w', encoding='utf-8') as f:
         f.write("\n".join(output))
     
     print("\n" + "\n".join(output))
     print(f"\nSaved: {args.output}")
     
-    # 生成表格图片
+    # Generate table image
     save_table_image(all_data, args.output)
 
 if __name__ == "__main__":

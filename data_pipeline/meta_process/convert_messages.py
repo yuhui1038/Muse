@@ -1,20 +1,20 @@
 """
-基于分段描述生成多轮对话数据（逐段生成）。
+Generate multi-turn dialogue data based on segment descriptions (segment-by-segment generation).
 
-输入：
-- MuseData/data/meta_suno_cn.jsonl      # 基础 meta（包含 src_path、lyrics、lang、tag 等）
-- 3_block_80000_cn_desc.jsonl           # 分段描述，含各 section 的 startS/endS/text/desc
-- mucodec pt 目录：同 multi_data_suno.py 的 PT_DIR_CN
+Input:
+- MuseData/data/meta_suno_cn.jsonl      # Base meta (contains src_path, lyrics, lang, tag, etc.)
+- 3_block_80000_cn_desc.jsonl           # Segment descriptions, contains startS/endS/text/desc for each section
+- mucodec pt directory: same as PT_DIR_CN in multi_data_suno.py
 
-输出：
-- MuseData/sft_dataset_suno_cn.jsonl    # 逐段生成的多轮对话
+Output:
+- MuseData/sft_dataset_suno_cn.jsonl    # Multi-turn dialogues generated segment by segment
 
-对话格式示例（参考 temp1.jsonl）：
-- 第一条 user：汇总提示（中文），说明“逐段”+ 提供 [Intro dsec...] 描述
-- 第一条 assistant：前奏 token（0 ~ 第一个 section 的 startS）
-- 后续每段：
+Dialogue format example (refer to temp1.jsonl):
+- First user: Summary prompt (Chinese), explains "segment-by-segment" + provides [Intro dsec...] description
+- First assistant: Intro tokens (0 ~ first section's startS)
+- Subsequent segments:
   user.content = "[{Section} dsec]{desc}\\n{text}"
-  assistant.content = 对应时间片段 token
+  assistant.content = corresponding time segment tokens
 """
 
 import json
@@ -26,30 +26,30 @@ import torch
 from tqdm import tqdm
 from my_tool import load_jsonl, clean_newlines
 
-# 语言配置
+# Language configuration
 LANG = "en"
-# 路径配置
+# Path configuration
 META_FILE = f"meta_suno_{LANG}.jsonl"
-# desc 文件夹，读取其中所有 *.jsonl
+# desc folder, read all *.jsonl files in it
 DESC_DIR = "desc"
 PT_DIR = f"suno_mucodec_{LANG}"
-# 输出目录（与 meta 不同目录），每个 desc 文件生成一组三个文件（中文）
+# Output directory (different from meta directory), each desc file generates a set of three files
 OUTPUT_DIR = "outputs"
 OUTPUT_BASENAME = "minus_phonemes"
 
 TOKEN_PER_SECOND = 25
 
 
-LOG_FILE = os.path.join(OUTPUT_DIR, "section_mismatch_cn.log")   # 放在输出目录里
+LOG_FILE = os.path.join(OUTPUT_DIR, "section_mismatch_cn.log")   # Place in output directory
 
 def _log_warning(msg: str):
-    """打印并落盘"""
+    """Print and save to file"""
     print(msg, end='\n')
     with open(LOG_FILE, 'a', encoding='utf-8') as f:
         f.write(msg + '\n')
 
 
-# 时间戳解析正则
+# Timestamp parsing regex
 timestamp_pattern = re.compile(
     r"\[([0-9]{1,2}):([0-9]{1,2})(?:[.:]([0-9]{1,3}))?\]"
 )
@@ -84,8 +84,8 @@ def infer_pt_path(src_path: str) -> Optional[str]:
 
 def parse_lyric_with_timestamps(lyric: str) -> List[Tuple[float, str]]:
     """
-    从带时间戳的歌词中解析出 [(start_time_s, text), ...]，按时间升序。
-    返回的时间戳来自 meta 文件中的 lyrics 字段。
+    Parse [(start_time_s, text), ...] from lyrics with timestamps, sorted by time ascending.
+    The returned timestamps come from the lyrics field in the meta file.
     """
     result: List[Tuple[float, str]] = []
     matches = list(timestamp_pattern.finditer(lyric))
@@ -116,49 +116,49 @@ def parse_lyric_with_timestamps(lyric: str) -> List[Tuple[float, str]]:
 
 def extract_section_from_text(text: str) -> Optional[str]:
     """
-    放宽规则：只要 [] 里包含英文单词（≥2 字母），整个括号内容原样返回。
+    Relaxed rule: As long as [] contains English words (≥2 letters), return the entire bracket content as-is.
     """
-    # 第一个 [] 内只要出现英文单词就匹配
+    # Match if English words appear in the first []
     m = re.search(r'\[([A-Za-z][A-Za-z0-9\s\-\(\)]*)\]', text)
     if m:
-        return m.group(1).strip()   # 去掉首尾空格
+        return m.group(1).strip()   # Remove leading and trailing spaces
     return None
 
 def format_section_label(sec_name: str) -> str:
-    """保持原有空格，只做首尾空白裁剪。"""
+    """Keep original spaces, only trim leading and trailing whitespace."""
     return sec_name.strip()
 
 
 def normalize_section_name(sec_name: str) -> str:
     """
-    标准化 section 名称用于匹配：
-    - 去掉所有空格
-    - 转小写
-    - 去掉末尾数字（如果有）
+    Normalize section name for matching:
+    - Remove all spaces
+    - Convert to lowercase
+    - Remove trailing digits (if any)
     """
-    # 去掉所有空格
+    # Remove all spaces
     normalized = sec_name.replace(" ", "").lower()
-    # 去掉末尾的数字（如 "verse1" -> "verse", "chorus1" -> "chorus"）
+    # Remove trailing digits (e.g., "verse1" -> "verse", "chorus1" -> "chorus")
     normalized = re.sub(r"\d+$", "", normalized)
     return normalized
 
 
 def clean_desc(desc: str) -> str:
     """
-    清理 desc 字段：
-    1. 如果开头有 [desc]，删去
-    2. 如果首尾都是中括号，把中括号删去
+    Clean desc field:
+    1. If starts with [desc], remove it
+    2. If both ends are brackets, remove brackets
     """
     if not desc:
         return desc
     
     desc = desc.strip()
     
-    # 如果开头有 [desc]，删去
+    # If starts with [desc], remove it
     if desc.startswith("[desc]"):
         desc = desc[6:].strip()
     
-    # 如果首尾都是中括号，把中括号删去
+    # If both ends are brackets, remove brackets
     if desc.startswith("[") and desc.endswith("]"):
         desc = desc[1:-1].strip()
     
@@ -167,8 +167,8 @@ def clean_desc(desc: str) -> str:
 
 def build_desc_map(desc_path_or_dir: str) -> Dict[Tuple[str, int], List[dict]]:
     """
-    支持传入单个 jsonl 文件或包含多个 jsonl 的目录。
-    目录场景下，会按文件名排序后逐个读取，后读到的同 key 会覆盖前面的记录。
+    Support passing a single jsonl file or a directory containing multiple jsonl files.
+    In directory scenario, files are sorted by name and read sequentially, later records with the same key will overwrite earlier ones.
     """
     mapping: Dict[Tuple[str, int], List[dict]] = {}
 
@@ -193,7 +193,7 @@ def build_desc_map(desc_path_or_dir: str) -> Dict[Tuple[str, int], List[dict]]:
                 song_id = obj.get("song_id")
                 track_idx = obj.get("track_index", 0)
 
-                # Change: 将整个放入
+                # Change: Put the entire object
                 # sections = obj.get("sections", [])
                 # mapping[(song_id, track_idx)] = sections
                 mapping[(song_id, track_idx)] = obj
@@ -202,9 +202,9 @@ def build_desc_map(desc_path_or_dir: str) -> Dict[Tuple[str, int], List[dict]]:
 
 def extract_suffix_from_desc_path(desc_path: str, fallback_idx: int) -> str:
     """
-    根据 desc 文件名提取后缀，用于输出文件命名。
-    规则：尝试从文件名中截取 "3_block_<suffix>_(cn|en)_desc.jsonl" 的 <suffix>。
-    如果无法匹配，使用 fallback_idx（从 0 开始）转为字符串。
+    Extract suffix from desc filename for output file naming.
+    Rule: Try to extract <suffix> from filename pattern "3_block_<suffix>_(cn|en)_desc.jsonl".
+    If no match, use fallback_idx (starting from 0) converted to string.
     """
     fname = os.path.basename(desc_path)
     m = re.search(r"3_block_([^_]+)_(?:cn|en)_desc\.jsonl", fname, re.IGNORECASE)
@@ -215,8 +215,8 @@ def extract_suffix_from_desc_path(desc_path: str, fallback_idx: int) -> str:
 
 def extract_suffix_num(desc_path: str, fallback_idx: int) -> int:
     """
-    提取可排序的数字后缀，用于按数字顺序处理 desc 文件。
-    无法解析时使用 fallback_idx。
+    Extract sortable numeric suffix for processing desc files in numeric order.
+    Use fallback_idx if parsing fails.
     """
     suffix = extract_suffix_from_desc_path(desc_path, fallback_idx)
     try:
@@ -227,13 +227,13 @@ def extract_suffix_num(desc_path: str, fallback_idx: int) -> int:
 
 def build_messages(item: dict, obj: dict, audio: torch.Tensor) -> Optional[dict]:
     """
-    使用 meta 中的时间戳来切分音频，desc_sections 提供 desc 和 text。
+    Use timestamps from meta to split audio, desc_sections provide desc and text.
     """
     if not obj:
         return None
     desc_sections = obj.get("sections", [])
 
-    # 从 meta 的 lyrics 中解析时间戳
+    # Parse timestamps from meta's lyrics
     lyrics_raw = item.get("lyrics", "") or ""
     meta_ts_list = parse_lyric_with_timestamps(lyrics_raw)
     if not meta_ts_list:
@@ -241,34 +241,34 @@ def build_messages(item: dict, obj: dict, audio: torch.Tensor) -> Optional[dict]
 
     total_seconds = audio.shape[0] / float(TOKEN_PER_SECOND)
     
-    # 排序 desc_sections（按 startS，用于匹配）
+    # Sort desc_sections (by startS, for matching)
     desc_sections = sorted(desc_sections, key=lambda x: x.get("startS", 0.0))
     
-    # 从 desc_sections 中获取中间的 sections（跳过第一个 Intro 和最后一个 Outro）
-    # Intro 和 Outro 不在 meta 的 lyrics 中，需要单独处理
-    # 中间的 sections 按顺序匹配
+    # Get middle sections from desc_sections (skip first Intro and last Outro)
+    # Intro and Outro are not in meta's lyrics, need separate handling
+    # Middle sections are matched in order
     middle_desc_sections = desc_sections[1:-1] if len(desc_sections) > 2 else desc_sections[1:] if len(desc_sections) > 1 else []
     
-    # 从 meta 时间戳中识别 section 并建立映射
-    # 一个 section 可能包含多行歌词，需要合并
+    # Identify sections from meta timestamps and build mapping
+    # One section may contain multiple lyric lines, need to merge
     section_timestamps: List[Tuple[str, float, float, str, str]] = []  # (section_name, start_s, end_s, text, desc)
     current_section: Optional[Tuple[str, float, str]] = None  # (section_name, start_s, accumulated_text)
-    desc_idx = 0  # 用于按顺序匹配 desc（从 middle_desc_sections 中匹配）
+    desc_idx = 0  # For matching desc in order (from middle_desc_sections)
     
     for idx, (start_s, text) in enumerate(meta_ts_list):
-        # 提取 section 名称
+        # Extract section name
         section_name = extract_section_from_text(text)
         
         if section_name:
-            # 遇到新的 section 标签
-            # 先保存上一个 section（如果有）
+            # Encountered new section label
+            # First save previous section (if any)
             if current_section:
-                # 确定上一个 section 的结束时间（当前时间戳）
+                # Determine end time of previous section (current timestamp)
                 prev_sec_name, prev_start_s, prev_text = current_section
-                # 只删除时间戳，保留其他所有内容（包括换行符、section标签等）
+                # Only remove timestamp, keep all other content (including line breaks, section labels, etc.)
                 clean_prev_text = re.sub(r"\[([0-9]{1,2}):([0-9]{1,2})(?:[.:]([0-9]{1,3}))?\]", "", prev_text)
                 
-                # 按顺序获取 desc（从中间的 sections 中按顺序匹配）
+                # Get desc in order (match from middle sections in order)
                 prev_desc = ""
                 if desc_idx < len(middle_desc_sections):
                     prev_desc = clean_desc(middle_desc_sections[desc_idx].get("desc", ""))
@@ -276,36 +276,36 @@ def build_messages(item: dict, obj: dict, audio: torch.Tensor) -> Optional[dict]
                 
                 section_timestamps.append((prev_sec_name, prev_start_s, start_s, clean_prev_text, prev_desc))
             
-            # 开始新的 section
+            # Start new section
             current_section = (section_name, start_s, text)
         else:
-            # 没有 section 标签，属于当前 section 的后续行
+            # No section label, belongs to subsequent lines of current section
             if current_section:
                 sec_name, sec_start, sec_text = current_section
-                # 保留换行符，用换行符连接
+                # Preserve line breaks, connect with line breaks
                 current_section = (sec_name, sec_start, sec_text + "\n" + text)
-            # 如果没有 current_section，跳过（可能是 Intro 前的空行）
+            # If no current_section, skip (might be empty line before Intro)
     
-    # 处理最后一个 section
-    # 检查最后一个时间戳是否是空文本（表示结尾标记）
+    # Process last section
+    # Check if last timestamp is empty text (indicates end marker)
     outro_start_s: Optional[float] = None
     if meta_ts_list and not meta_ts_list[-1][1].strip():
-        # 最后一个时间戳是空文本，表示结尾标记
+        # Last timestamp is empty text, indicates end marker
         outro_start_s = meta_ts_list[-1][0]
     
     if current_section:
         sec_name, sec_start, sec_text = current_section
-        # 如果最后一个时间戳是空文本，最后一个 section 的结束时间应该是这个时间戳
-        # 否则使用总时长
+        # If last timestamp is empty text, last section's end time should be this timestamp
+        # Otherwise use total duration
         if outro_start_s is not None:
             end_s = outro_start_s
         else:
             end_s = total_seconds
         
-        # 只删除时间戳，保留其他所有内容
+        # Only remove timestamp, keep all other content
         clean_text = re.sub(r"\[([0-9]{1,2}):([0-9]{1,2})(?:[.:]([0-9]{1,3}))?\]", "", sec_text)
         
-        # 按顺序获取 desc（从中间的 sections 中按顺序匹配）
+        # Get desc in order (match from middle sections in order)
         desc = ""
         if desc_idx < len(middle_desc_sections):
             desc = clean_desc(middle_desc_sections[desc_idx].get("desc", ""))
@@ -313,16 +313,16 @@ def build_messages(item: dict, obj: dict, audio: torch.Tensor) -> Optional[dict]
         
         section_timestamps.append((sec_name, sec_start, end_s, clean_text, desc))
     
-    # 检查个数是否匹配（只检查中间的 sections，不包括 Intro 和 Outro）
+    # Check if counts match (only check middle sections, excluding Intro and Outro)
     if desc_idx != len(middle_desc_sections):
-        _log_warning(f"⚠️ 警告：section 个数不匹配！meta 中有 {len(section_timestamps)} 个 section，desc 中有 {len(middle_desc_sections)} 个中间 section（不包括 Intro 和 Outro）(song_id: {item.get('song_id')}, track_index: {item.get('track_index')})")
+        _log_warning(f"⚠️ Warning: Section count mismatch! meta has {len(section_timestamps)} sections, desc has {len(middle_desc_sections)} middle sections (excluding Intro and Outro) (song_id: {item.get('song_id')}, track_index: {item.get('track_index')})")
     
     if not section_timestamps:
         return None
 
-    # Intro 段：从 0 到第一个 section 的开始时间
-    # Intro 的 desc 应该已经在顺序匹配中获取了，但 Intro 本身不在 meta 的 lyrics 中
-    # 所以需要从 desc_sections 的第一个 section（通常是 Intro）获取
+    # Intro segment: from 0 to first section's start time
+    # Intro's desc should have been obtained in sequential matching, but Intro itself is not in meta's lyrics
+    # So need to get from desc_sections' first section (usually Intro)
     first_section_start = section_timestamps[0][1] if section_timestamps else total_seconds
     intro_desc = ""
     if desc_sections and desc_sections[0].get("section", "").lower() == "intro":
@@ -335,16 +335,16 @@ def build_messages(item: dict, obj: dict, audio: torch.Tensor) -> Optional[dict]
     style_tag = obj.get("style", "")
 
     if song_id.find("cn") != -1:
-        # 中文歌直接用omni
+        # Chinese songs use omni directly
         tag = omni_tag
     else:
-        # 英文歌比较omni / style
+        # English songs compare omni / style
         style_sim = obj.get("style_sim", 0)
         omni_sim = obj.get("omni_sim", 0)
         try:
             tag = omni_tag if omni_sim > style_sim else style_tag
         except Exception as e:
-            # sim分数有误默认omni
+            # If sim score is invalid, default to omni
             tag = omni_tag
             print(f"Error: {song_id}, {e}")
 
@@ -364,9 +364,9 @@ def build_messages(item: dict, obj: dict, audio: torch.Tensor) -> Optional[dict]
         }
     )
 
-    # 逐段处理（使用 meta 中的时间戳）
+    # Process segment by segment (using timestamps from meta)
     for idx, (sec_name, start_s, end_s, text, desc) in enumerate(section_timestamps):
-        # user content: [Section dsec : desc][Section lyrics : ...]（保留原有空格）
+        # user content: [Section dsec : desc][Section lyrics : ...] (preserve original spaces)
         label = format_section_label(sec_name)
         content = f"[{label}]"
         content += f"[desc:{desc}]"
@@ -381,8 +381,8 @@ def build_messages(item: dict, obj: dict, audio: torch.Tensor) -> Optional[dict]
             }
         )
     
-    # 如果最后一个时间戳是空文本，添加 Outro 段
-    # Outro 的 desc 应该从 desc_sections 的最后一个 section 获取（通常是 Outro）
+    # If last timestamp is empty text, add Outro segment
+    # Outro's desc should be obtained from desc_sections' last section (usually Outro)
     if outro_start_s is not None and outro_start_s < total_seconds:
         outro_desc = ""
         if desc_sections and desc_sections[-1].get("section", "").lower() == "outro":
@@ -410,13 +410,13 @@ def build_messages(item: dict, obj: dict, audio: torch.Tensor) -> Optional[dict]
 
 def process_with_desc(desc_path: str, suffix: str) -> None:
     """
-    使用单个 desc 文件生成输出文件（messages-only / meta-only）。
-    不生成主文件。
+    Generate output files using a single desc file (messages-only / meta-only).
+    Does not generate main file.
     """
     desc_map = build_desc_map(desc_path)
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    # messages-only 去掉后缀命名，仅保留 block 序号（如 ..._8000.jsonl）
+    # messages-only naming: remove suffix, only keep block number (e.g., ..._8000.jsonl)
     out_msg = os.path.join(OUTPUT_DIR, f"{OUTPUT_BASENAME}_{suffix}.jsonl")
     out_meta = os.path.join(OUTPUT_DIR, f"{OUTPUT_BASENAME}_{suffix}_meta_only.jsonl")
 
@@ -436,7 +436,7 @@ def process_with_desc(desc_path: str, suffix: str) -> None:
     with open(out_msg, "a", encoding="utf-8") as fout_msg, \
          open(out_meta, "a", encoding="utf-8") as fout_meta:
         
-        for item in tqdm(dataset, desc=f"处理 meta_suno_{LANG}.jsonl (desc: {suffix})"):
+        for item in tqdm(dataset, desc=f"Processing meta_suno_{LANG}.jsonl (desc: {suffix})"):
             key = (item.get("song_id"), item.get("track_index", 0))
 
             obj = desc_map.get(key)
@@ -456,23 +456,23 @@ def process_with_desc(desc_path: str, suffix: str) -> None:
                 skipped += 1
                 continue
 
-            # 写 messages-only（去除 _messages_only 后缀）
+            # Write messages-only (remove _messages_only suffix)
             messages_only = {"messages": sample.get("messages", [])}
             fout_msg.write(json.dumps(messages_only, ensure_ascii=False) + "\n")
-            # 写 meta-only
+            # Write meta-only
             meta_only = {k: v for k, v in sample.items() if k != "messages"}
             fout_meta.write(json.dumps(meta_only, ensure_ascii=False) + "\n")
             kept += 1
 
     print(f"✅ messages-only: {out_msg}")
     print(f"✅ meta-only: {out_meta}")
-    print(f"总计 {total}，保留 {kept}，跳过 {skipped}")
+    print(f"Total {total}, kept {kept}, skipped {skipped}")
 
 
 def convert_train_valid():
-    # 收集 desc 文件
+    # Collect desc files
     if not os.path.isdir(DESC_DIR):
-        print(f"⚠️ DESC_DIR 不存在: {DESC_DIR}")
+        print(f"⚠️ DESC_DIR does not exist: {DESC_DIR}")
         return
 
     unsorted_files = [
@@ -481,13 +481,13 @@ def convert_train_valid():
         if name.endswith(".jsonl")
     ]
 
-    # 按提取的数字后缀排序，保证 8000 排在 16000 前
+    # Sort by extracted numeric suffix, ensure 8000 comes before 16000
     desc_files = sorted(
         unsorted_files,
         key=lambda p: extract_suffix_num(p, 0),
     )
     if not desc_files:
-        print(f"⚠️ 未找到 desc 文件: {DESC_DIR}")
+        print(f"⚠️ No desc files found: {DESC_DIR}")
         return
 
     # Change
@@ -500,24 +500,24 @@ def convert_train_valid():
         if name.endswith(LANG):
             process_with_desc(desc_path, name)
 
-# assistant需要，只是内容为空
-# 然后里面每个section有3个desc，你取最大值对应的
-# omni也有两个，取最大的那个（style就不用了）
+# assistant needs, but content is empty
+# Then each section inside has 3 descs, you take the one corresponding to the maximum value
+# omni also has two, take the larger one (style is not used)
 
 from meta_phonemes import _get_lyrics, _trans_sentences
 
 def _form_section(section:dict, en:bool) -> str:
-    """处理一个section内部，确定选择对应desc"""
-    # 段落标签
+    """Process inside a section, determine which desc to select"""
+    # Segment label
     section_tag = f"[{section['section']}]"
-    # 段落描述
+    # Segment description
     descs = [section['desc1'], section['desc2'], section['desc3']]
     sims = [section['desc1_sim'], section['desc2_sim'], section['desc3_sim']]
     max_sim = max(sims)
     max_index = sims.index(max_sim)
     desc:str = descs[max_index]
     
-    if desc == "音频过短":
+    if desc == "音频过短":  # "Audio too short"
         desc = "[desc:]"
     else:
         DESC_START = "[desc] "
@@ -525,14 +525,14 @@ def _form_section(section:dict, en:bool) -> str:
             desc = desc[len(DESC_START):] + "]"
         desc = "[desc:" + desc[1:]
     
-    # 歌词 & 音素
+    # Lyrics & phonemes
     text:str = section['text']
     if text.find(']') != -1:
-        # 去除前面的段落标签
+        # Remove preceding segment label
         start = text.rfind(']')
         text = text[start+1:]
     if len(text.strip()) == 0:
-        # 开头段没有歌词/音素
+        # Opening segment has no lyrics/phonemes
         lyrics = ""
         phonemes = ""
     else:
@@ -546,7 +546,7 @@ def _form_section(section:dict, en:bool) -> str:
     return section_tag + desc + lyrics + phonemes
 
 def _form_intro(ele:dict) -> str:
-    """处理得到一个多轮对话开头"""
+    """Process to get multi-turn dialogue opening"""
     omni1 = ele['omni1']
     omni2 = ele['omni2']
     omni_sim1 = ele['omni1_sim']
@@ -564,7 +564,7 @@ def convert_test():
     with open(save_path, 'w', encoding='utf-8') as file:
         for ele in tqdm(dataset, desc=f"Converting {path}"):
             messages = []
-            # 段落处理
+            # Segment processing
             sections = ele['sections']
             id:str = ele['song_id']
             english = id.startswith("suno_test_en")
@@ -580,7 +580,7 @@ def convert_test():
                         "content": ""
                     }
                 ]
-            # 初始添加
+            # Initial addition
             first_content = messages[0]['content']
             intro = _form_intro(ele)
             messages[0]['content'] = intro + first_content

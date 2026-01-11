@@ -7,10 +7,10 @@ from my_tool import dict_sort_print
 from collections import defaultdict
 from convert_convs import _parse_lyric_with_timestamps
 
-# ===== 歌词解析 =====
+# ===== Lyric Parsing =====
 
 def _parse_lyrics(text:str) -> dict:
-    """解析歌词信息中的元信息，歌词和时间戳"""
+    """Parse metadata, lyrics and timestamps from lyric information"""
     segs = text.split("\n")
     metadata = {
         "lyrics_meta": {},
@@ -18,11 +18,11 @@ def _parse_lyrics(text:str) -> dict:
         "lyrics_time": [],
     }
     for seg in segs:
-        # 形如[time] metadata / lyrics
+        # Format: [time] metadata / lyrics
         results = _parse_lyric_with_timestamps(seg)
         for time, content in results:
             if ":" in content or "：" in content:
-                # 元信息
+                # Metadata
                 pos1 = content.find(":")
                 pos2 = content.find("：")
                 pos = pos1 if pos1 != -1 else pos2
@@ -30,32 +30,32 @@ def _parse_lyrics(text:str) -> dict:
                 value = content[pos+1:].strip()
                 metadata["lyrics_meta"][key] = value
             elif time == "00:00.00":
-                # 开头非结构化元信息
+                # Unstructured metadata at the beginning
                 continue
             elif len(metadata['lyrics']) == 0 and "/" in content:
-                # 开头非结构化元信息
+                # Unstructured metadata at the beginning
                 continue
             else:
-                # 只保留英文和空格标点
+                # Only keep English and space punctuation
                 if len(content) == 0:
-                    # 中间空隙/结束
+                    # Middle gap/end
                     if len(metadata['lyrics']) != 0 and metadata['lyrics'][-1] != "<nop>":
-                        # 如果没有前一段(开头)，或者前一段为空也不记(合并)
+                        # If there's no previous segment (beginning), or previous segment is empty, don't record (merge)
                         metadata['lyrics'].append("<nop>")
                         metadata['lyrics_time'].append(time)
                 else:
                     if len(metadata['lyrics_time']) != 0 and metadata['lyrics_time'][-1] == time and time != "<nop>":
-                        # 时间戳相同说明是在翻译(不记录)
+                        # Same timestamp means it's a translation (don't record)
                         continue
-                    # 实际歌词
+                    # Actual lyrics
                     metadata['lyrics'].append(content)
                     metadata['lyrics_time'].append(time)
     return metadata
 
-# ===== 语言检测 =====
+# ===== Language Detection =====
 
 def _count_ch_nan(text:str):
-    """计算一个字符串内中文和其它非英文字符的数量"""
+    """Count the number of Chinese and other non-English characters in a string"""
     ch_num = 0
     nan_num = 0
     nan = ""
@@ -73,9 +73,9 @@ def _count_ch_nan(text:str):
 
 def _lang_decide(lyrics:list[str], val_limit:int=5, word_limit=3) -> str:
     """
-    判断歌词的语言类型(en/zh/ez/instrument/nan)
-    - val_limit: 不少于这么多句才计入
-    - word_limit: 一句不少于这么多字才计入
+    Determine the language type of lyrics (en/zh/ez/instrument/nan)
+    - val_limit: Only count if there are at least this many sentences
+    - word_limit: Only count if a sentence has at least this many words
     """
     ch_lyrics = 0
     en_lyrics = 0
@@ -84,7 +84,7 @@ def _lang_decide(lyrics:list[str], val_limit:int=5, word_limit=3) -> str:
         lyric = copy.deepcopy(lyric)
         if lyric.strip() == "<nop>":
             continue
-        lyric = re.sub(r"[‘’￥·′´（），。？“”!@#$%^&*()?.'/,=+_—— ！…《》<>0-9～※~;－・\"、☆｜△【】＃「」‖{}\[\]-]", " ", lyric)
+        lyric = re.sub(r"[''￥·′´（），。？""!@#$%^&*()?.'/,=+_—— ！…《》<>0-9～※~;－・\"、☆｜△【】＃「」‖{}\[\]-]", " ", lyric)
         ch_num, nan_num = _count_ch_nan(lyric)
         
         if nan_num > word_limit:
@@ -94,7 +94,7 @@ def _lang_decide(lyrics:list[str], val_limit:int=5, word_limit=3) -> str:
             ch_lyrics += 1
         
         lyric = re.sub(r'[\u4e00-\u9fff]+', '', lyric)
-        # 空格分隔看英文数量
+        # Count English words by space separation
         en_num = len(lyric.split(" "))
         if en_num > word_limit:
             en_lyrics += 1
@@ -109,39 +109,39 @@ def _lang_decide(lyrics:list[str], val_limit:int=5, word_limit=3) -> str:
         return "en"
     return "instrument"
 
-# ===== 对外接口 =====
+# ===== External Interface =====
 
 def get_convert_lyrics(dataset:list[dict], save_path:str, dir:str, src_subfix:str=""):
-    """对歌词进行转换，并标注歌词语言类型(需定位对应歌曲)"""
+    """Convert lyrics and annotate language type (need to locate corresponding song)"""
     new_dataset = []
     lang_count = defaultdict(int)
     unmatch = []
     with open(save_path, 'w', encoding='utf-8') as file:
         for ele in tqdm(dataset, desc="Converting Lyrics"):
             ele = copy.deepcopy(ele)
-            # 没有歌词则跳过
+            # Skip if no lyrics
             if not ele['has_lyric']:
-                # 不添加到最后结果
+                # Don't add to final result
                 continue
-            # 获取歌词
+            # Get lyrics
             lyric = ele['lyric']
             if lyric == "":
                 lyric = ele['tlyric']
 
-            # 歌词解析
+            # Parse lyrics
             new_data = _parse_lyrics(lyric)
 
-            # 语言解析
+            # Language detection
             lang = _lang_decide(new_data['lyrics'])
             lang_count[lang] += 1
 
-            # 除去多余字段
+            # Remove redundant fields
             del ele['artists']
             del ele['lyric']
             del ele['tlyric']
             del ele['has_lyric']
 
-            # 添加新字段
+            # Add new fields
             ele['lyric_lang'] = lang
             ele['source'] += src_subfix
             for key, value in new_data.items():
@@ -155,8 +155,8 @@ def get_convert_lyrics(dataset:list[dict], save_path:str, dir:str, src_subfix:st
     return new_dataset, unmatch
 
 def get_match_music(music_data:list[dict], lyric_data:list[dict]):
-    """获取与歌词匹配或不匹配的歌曲"""
-    # 1. 用歌曲构建查找集
+    """Get songs that match or don't match with lyrics"""
+    # 1. Build lookup set from songs
     name_map = {}
     for ele in tqdm(lyric_data, desc="Existing Lyrics"):
         name = ele['name']
@@ -165,7 +165,7 @@ def get_match_music(music_data:list[dict], lyric_data:list[dict]):
         complete_name = f"{name} - {artist}.mp3"
         name_map[complete_name] = ele
     
-    # 2. 遍历歌曲找出剩下的
+    # 2. Iterate through songs to find remaining ones
     matches = []
     unmatches = []
     for ele in tqdm(music_data, desc="Check Matching"):

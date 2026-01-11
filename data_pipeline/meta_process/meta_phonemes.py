@@ -15,10 +15,10 @@ re_special_pinyin = re.compile(r'^(n|ng|m)$')
 reference = load_json("poly_correct.json")
 load_phrases_dict(reference)
 
-# ===== 中文转换 =====
+# ===== Chinese Conversion =====
 
 def _split_py(py):
-    """将带声调数字的拼音拆成声母sm、韵母ym两部分"""
+    """Split pinyin with tone number into initial (sm) and final (ym) parts"""
     tone = py[-1]
     py = py[:-1]
     sm = ""
@@ -77,7 +77,7 @@ def _split_py(py):
     ym += suf_r + tone
     return sm, ym
 
-# 所有中文符号
+# All Chinese punctuation
 chinese_punctuation_pattern = r'[\u3002\uff0c\uff1f\uff01\uff1b\uff1a\u201c\u201d\u2018\u2019\u300a\u300b\u3008\u3009\u3010\u3011\u300e\u300f\u2014\u2026\u3001\uff08\uff09]'
 
 def _has_ch_punc(text):
@@ -88,21 +88,21 @@ def _has_en_punc(text):
     return text in string.punctuation
 
 def _trans_cn(text:str, with_sp=True):
-    """中文转音素"""
+    """Convert Chinese to phonemes"""
     phonemes = []
-    # 分词
+    # Word segmentation
     seg_list = jieba.cut(text)
-    # 逐词处理
+    # Process word by word
     for seg in seg_list:
-        # 字符串有效性
+        # String validity
         if seg.strip() == "": continue
         # seg_tn = tn_chinese(seg)
-        # 转成拼音(不要声调)
+        # Convert to pinyin (without tone)
         py =[_py[0] for _py in pinyin(seg, style=Style.TONE3, neutral_tone_with_five=True)]
-        # 标点检测(有的话跳过)
+        # Punctuation detection (skip if present)
         if any([_has_ch_punc(_py) for _py in py])  or any([_has_en_punc(_py) for _py in py]):
             continue
-        # 拼音拆分
+        # Split pinyin
         # phonemes += _split_py(_py)
         for _py in py:
             sm, ym = _split_py(_py)
@@ -114,10 +114,10 @@ def _trans_cn(text:str, with_sp=True):
             phonemes += ["sp"]
     return phonemes
 
-# ===== 英文转换 =====
+# ===== English Conversion =====
 
 def _read_lexicon(lex_path):
-    """读取英文词典"""
+    """Read English lexicon"""
     lexicon = {}
     with open(lex_path) as f:
         for line in f:
@@ -134,32 +134,32 @@ lexicon = _read_lexicon(LEX_PATH)
 g2p = G2p()
 
 def _trans_en(word:str, with_sp=True):
-    """英文(单词)转音素"""
+    """Convert English (word) to phonemes"""
     w_lower = word.lower()
     phonemes = []
     if w_lower in lexicon:
-        # 词典有就用词典(不能直接获取引用)
+        # Use lexicon if available (cannot directly get reference)
         phonemes += lexicon[w_lower]
     else:
-        # 词典没有就用G2P
+        # Use G2P if not in lexicon
         phonemes = g2p(w_lower)
         if not phonemes:
             phonemes = []
-        # 添加进词典
+        # Add to lexicon
         lexicon[w_lower] = phonemes
     if len(phonemes) > 0 and with_sp:
         phonemes.append("sp")
     return phonemes
 
-# ===== 单句处理 =====
+# ===== Single Sentence Processing =====
 
 def _char_lang(c:str) -> int:
     """
-    检查一个字符是中文英文还是其它
-    0 - 中文
-    1 - 英文
-    2 - 数字
-    3 - 其它
+    Check if a character is Chinese, English, or other
+    0 - Chinese
+    1 - English
+    2 - Number
+    3 - Other
     """
     if '\u4e00' <= c <= '\u9fff':
         return 0
@@ -184,16 +184,16 @@ NUMBER_MAP = {
 }
 
 def _lang_seperate(text:str) -> list[str]:
-    """根据语言切分字符串"""
-    lang_segs = []      # 拆分出的字符串集合
-    lang_tags = []      # 各字符串段的标签
-    lang_seg = ""       # 上一个连续语言字符串
-    lang_tag = -1       # 上一个字符的语言类型
+    """Split string by language"""
+    lang_segs = []      # Set of split strings
+    lang_tags = []      # Tags for each string segment
+    lang_seg = ""       # Previous continuous language string
+    lang_tag = -1       # Language type of previous character
     en_count = 0
     for c in text:
         lang = _char_lang(c)
         if lang_tag != lang:
-            # 和上一个字符类型不同
+            # Different from previous character type
             if lang_seg != "":
                 lang_segs.append(lang_seg)
                 lang_tags.append(lang_tag)
@@ -201,73 +201,73 @@ def _lang_seperate(text:str) -> list[str]:
                     en_count += 1
                 lang_seg = ""
             if lang == 2 and en_count >= 4:
-                # 英文中的数字转换
+                # Number conversion in English
                 lang_segs.append(NUMBER_MAP[c])
                 lang_tags.append(1)
             lang_tag = lang
         if lang < 2:
             lang_seg += c
     if lang_seg != "":
-        # 最后一段有效的
+        # Last valid segment
         lang_segs.append(lang_seg)
         lang_tags.append(lang_tag)
     return lang_segs, lang_tags
 
 def _phoneme_trans(text:str, with_sp=True):
-    """将一段歌词转成音素"""
-    # 按语言切分
+    """Convert a lyric segment to phonemes"""
+    # Split by language
     lang_segs, lang_tags = _lang_seperate(text)
-    # 逐段转换
+    # Convert segment by segment
     phonemes = []
     for lang_seg, lang_tag in zip(lang_segs, lang_tags):
         if lang_tag == 0:
-            # 中文
+            # Chinese
             phonemes += _trans_cn(lang_seg, with_sp)
         else:
-            # 英文
+            # English
             phonemes += _trans_en(lang_seg, with_sp)
     return phonemes
 
-# ===== 动态适配 =====
+# ===== Dynamic Adaptation =====
 
 def _get_lyrics(raw_content:str) -> list[str]:
-    """从对话中获取歌词内容, 形如'[stage][dsec:xxx][lyrics:xxx\nxxx]'"""
+    """Extract lyric content from dialogue, format like '[stage][dsec:xxx][lyrics:xxx\nxxx]'"""
     START_FORMAT = "[lyrics:"
     start = raw_content.find(START_FORMAT)
     if start == -1:
         return None, None
     content = raw_content[start+len(START_FORMAT):-1]
-    # 过滤中括号
-    content = re.sub(r'\[.*?\]', '', content)   # 前后完整的
-    content = re.sub(r'[\[\]]', '', content)    # 不闭合的
-    # 句子拆分
+    # Filter brackets
+    content = re.sub(r'\[.*?\]', '', content)   # Complete brackets
+    content = re.sub(r'[\[\]]', '', content)    # Unclosed brackets
+    # Split sentences
     sentences = content.split("\n")
-    # 拼接还原
+    # Reconstruct
     new_content = raw_content[:start] + START_FORMAT + content + "]"
     return sentences, new_content
 
 def _trans_sentences(sentences:list[str], with_sp:bool=True) -> str:
-    """将句子列表装换成包装好的音素字串"""
+    """Convert sentence list to wrapped phoneme string"""
     phonemes_lis = []
     for sentence in sentences:
         phonemes = _phoneme_trans(sentence, with_sp)
         phonemes_lis.append(" ".join(phonemes))
-    # 封装
+    # Wrap
     phonemes_str = '\n'.join(phonemes_lis)
     envelope = f"[phoneme:{phonemes_str}]"
-    envelope = re.sub(r'\d+', '', envelope)     # 去除音调
+    envelope = re.sub(r'\d+', '', envelope)     # Remove tones
     return envelope
 
-# ===== 对外接口 =====
+# ===== External Interface =====
 
 def get_phonemes_meta(dataset:list[dict], save_path:str, with_sp:bool=True):
-    """为数据集中的歌词加上音素"""
+    """Add phonemes to lyrics in dataset"""
     new_dataset = []
     with open(save_path, 'w', encoding='utf-8') as file:
         for ele in tqdm(dataset, desc="Phoneme trans"):
             ele = copy.deepcopy(ele)
             messages = ele['messages']
-            # 第一句不要，只对后面的逐句处理
+            # Skip first message, process subsequent ones sentence by sentence
             for message in messages[1:]:
                 if message['role'] == "assistant":
                     continue

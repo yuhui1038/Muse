@@ -8,12 +8,12 @@ from pypinyin_dict.phrase_pinyin_data import cc_cedict
 cc_cedict.load()
 re_special_pinyin = re.compile(r'^(n|ng|m)$')
 
-# 添加
+# Add
 reference = load_json("poly_correct.json")
 load_phrases_dict(reference)
 
 def _filter(dataset:list[dict]):
-    """过滤测试集中非pinyin多音字"""
+    """Filter non-polyphone characters in test set"""
     new_dataset = []
     for ele in tqdm(dataset, desc="Filtering"):
         pos = ele['pos']
@@ -26,7 +26,7 @@ def _filter(dataset:list[dict]):
     return new_dataset
 
 def evaluate_polyphones(dataset:list[dict], save_fail:str):
-    """检查pinyin对多音字的处理精度"""
+    """Check pinyin processing accuracy for polyphones"""
     dataset = _filter(dataset)
     total = len(dataset)
     right = 0
@@ -39,7 +39,7 @@ def evaluate_polyphones(dataset:list[dict], save_fail:str):
         length = 0
         for seg in seg_list:
             if length <= pos and length + len(seg) > pos:
-                delta = pos - length    # 小段中的位置
+                delta = pos - length    # Position in segment
                 break
             length += len(seg)
         pred_phones = pinyin(seg, style=Style.NORMAL)
@@ -47,7 +47,7 @@ def evaluate_polyphones(dataset:list[dict], save_fail:str):
         if pred_phone == phone or pred_phone.endswith("v"):
             right += 1
         elif len(pred_phones) > 1:
-            # 修正后的读音(词语才有意义)
+            # Corrected pronunciation (only meaningful for phrases)
             pred_phones[delta] = [phone]
             correct_dic[seg] = pred_phones
     print(f"Acc: {(right / total):.2f}")

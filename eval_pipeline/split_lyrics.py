@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-拆分已有歌词: 将完整目录中的 txt 歌词按中英文拆分到对应目录
-用法: python split_lyrics.py <源目录> <目标基础目录>
-示例: python split_lyrics.py ./audio/sunov4_5 ./audio
-      -> ./audio/sunov4_5_cn/transcription.jsonl (索引 1-50 -> 0-49)
-      -> ./audio/sunov4_5_en/transcription.jsonl (索引 51-100 -> 0-49)
+Split existing lyrics: Split txt lyrics in a complete directory into Chinese and English directories
+Usage: python split_lyrics.py <source_directory> <target_base_directory>
+Example: python split_lyrics.py ./audio/sunov4_5 ./audio
+      -> ./audio/sunov4_5_cn/transcription.jsonl (index 1-50 -> 0-49)
+      -> ./audio/sunov4_5_en/transcription.jsonl (index 51-100 -> 0-49)
 
-适用场景: 在拆分音频前已经转录好了歌词 txt 文件
+Use case: When lyrics txt files have been transcribed before splitting audio
 """
 import os, re, argparse, json
 from pathlib import Path
@@ -16,11 +16,11 @@ def extract_idx(filename):
     return int(matches[-1]) if matches else None
 
 def read_lyrics(txt_path):
-    """读取txt文件，提取歌词"""
+    """Read txt file and extract lyrics"""
     try:
         with open(txt_path, 'r', encoding='utf-8') as f:
             lines = f.readlines()
-        # 跳过第一行如果是语言标识
+        # Skip first line if it's a language identifier
         if lines and lines[0].strip().lower() in ['chinese', 'english', 'zh', 'en']:
             lines = lines[1:]
         return ' '.join(line.strip() for line in lines if line.strip())
@@ -29,8 +29,8 @@ def read_lyrics(txt_path):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("src_dir", help="包含 txt 歌词的源目录")
-    parser.add_argument("dst_dir", help="目标目录 (会生成 name_cn 和 name_en)")
+    parser.add_argument("src_dir", help="Source directory containing txt lyric files")
+    parser.add_argument("dst_dir", help="Target directory (will generate name_cn and name_en)")
     args = parser.parse_args()
     
     src = Path(args.src_dir)
@@ -42,7 +42,7 @@ def main():
     
     cn_trans, en_trans = [], []
     
-    # 遍历所有 txt 文件
+    # Iterate through all txt files
     for txt_path in sorted(src.glob("*.txt")):
         idx = extract_idx(txt_path.name)
         if idx is None:
@@ -50,7 +50,7 @@ def main():
         
         lyrics = read_lyrics(txt_path)
         
-        # 推断音频扩展名
+        # Infer audio extension
         base = txt_path.stem
         audio_ext = ".mp3"
         for ext in ['.mp3', '.wav']:
@@ -77,7 +77,7 @@ def main():
                 "hyp_text": lyrics
             })
     
-    # 写入 transcription.jsonl
+    # Write transcription.jsonl
     for trans_list, out_dir, lang in [(cn_trans, cn_dir, "cn"), (en_trans, en_dir, "en")]:
         if trans_list:
             out_dir.mkdir(parents=True, exist_ok=True)

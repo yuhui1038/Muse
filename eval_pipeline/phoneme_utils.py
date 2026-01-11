@@ -14,7 +14,7 @@ g2p = G2p()
 cc_cedict.load()
 
 # Load custom polyphone corrections if available
-poly_correct_path = "poly_correct.json"
+poly_correct_path = "eval_pipeline/poly_correct.json"
 if os.path.exists(poly_correct_path):
     try:
         with open(poly_correct_path, 'r', encoding='utf-8') as f:

@@ -33,7 +33,7 @@ def pipeline():
     name = pure_name(dir)
     save_dir = BASE_DIR / f"data/{name}"
 
-    # 初始化路径(仅做一次)
+    # Initialize paths (only once)
     os.makedirs(save_dir, exist_ok=True)
     raw_path = os.path.join(save_dir, "raw.jsonl")
     if os.path.exists(raw_path):
@@ -42,21 +42,21 @@ def pipeline():
         dataset = format_meta(dir)
     save_jsonl(dataset, raw_path)
 
-    # 长度过滤
+    # Length filtering
     dataset = dataset[:1000]
     max_workers = 10
     dataset = filter_length(dataset, 120, 360, max_workers)
 
-    # 语言标签
+    # Language tagging
     # lang_bs = 8
     # model = load_asr_model(lang_bs)
     # lang_path = os.path.join(save_dir, "meta_lang.jsonl")
     # dataset = get_lang_meta(model, dataset, lang_bs, lang_path)
 
-    # 语言过滤
+    # Language filtering
     # dataset = filter_lang(dataset, ['zh', 'en'])
 
-    # 风格标签
+    # Style tagging
     tag_bs = 4
     tag_path = os.path.join(save_dir, "meta_tags.jsonl")
     model, processor = load_tag_model()

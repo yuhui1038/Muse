@@ -6,10 +6,10 @@ from typing import List, Tuple
 from collections import defaultdict
 from my_tool import get_free_gpu, dup_remove
 
-# ===== ASR模型(对外) =====
+# ===== ASR Model (External) =====
 
 def load_asr_model(bs:int):
-    """加载歌词识别模型"""
+    """Load lyric recognition model"""
     device = f"cuda:{get_free_gpu()}"
     model = AutoModel(
         model="iic/SenseVoiceSmall",
@@ -23,10 +23,10 @@ def load_asr_model(bs:int):
     print(f"Using {device}")
     return model
 
-# ===== ASR解析 =====
+# ===== ASR Parsing =====
 
 def _struct2lang(text: str) -> str:
-    """从结构化表示中提取语言标识"""
+    """Extract language identifier from structured representation"""
     start = text.find("|")
     text = text[start+1:]
     end = text.find("|")
@@ -38,7 +38,7 @@ def _struct2lyrics(text:str) -> str:
     return lyric
 
 def _struct_parse(text: str) -> Tuple[List[str], List[str]]:
-    """将结构化信息逐句切分再做解析"""
+    """Split structured information sentence by sentence and then parse"""
     texts = text.split(" <")
     langs, lyrics = [], []
     for ele in texts:
@@ -46,10 +46,10 @@ def _struct_parse(text: str) -> Tuple[List[str], List[str]]:
         lyrics.append(_struct2lyrics(ele))
     return langs, lyrics
 
-# ===== ASR处理 =====
+# ===== ASR Processing =====
 
 def _batch_asr(model, paths:List[str]) -> List[Tuple[List[str], List[str]]]:
-    """批量语音识别"""
+    """Batch speech recognition"""
     outputs = model.generate(
         input=paths,
         cache=None,
@@ -61,13 +61,13 @@ def _batch_asr(model, paths:List[str]) -> List[Tuple[List[str], List[str]]]:
     )
     return [_struct_parse(output['text']) for output in outputs]
 
-# ===== 整体语言判别 =====
+# ===== Overall Language Detection =====
 
 def _lang_decide(lang_lyrics:list[tuple[str, str]], val_limit:int=5, word_limit=5) -> str:
     """
-    根据句识别信息做语言判断
-    - val_limit: 不少于这么多句才计入
-    - word_limit: 一句不少于这么多字才计入
+    Determine language based on sentence recognition information
+    - val_limit: Only count if there are at least this many sentences
+    - word_limit: Only count if a sentence has at least this many words
     """
     lang_count = defaultdict(int)
     seg_langs, seg_lyrics = lang_lyrics
@@ -90,13 +90,13 @@ def _lang_decide(lang_lyrics:list[tuple[str, str]], val_limit:int=5, word_limit=
     else:
         return "multi: " + " ".join(langs)
 
-# ===== 对外接口 =====
+# ===== External Interface =====
 
 def get_lang_meta(model, dataset:list[dict], bs:int, save_path:str, save_middle:bool=True) -> list[dict]:
     """
-    对一个JSONL数据集做语言识别
-    - 最后语言标签保存到lang字段，有zh, en, ja, ko, yue, pure, multi等类型
-    - save_middle决定是否将识别的中间结果——各句的语言和歌词保存到save.langs, save.lyrics
+    Perform language recognition on a JSONL dataset
+    - Final language tag is saved to lang field, types include zh, en, ja, ko, yue, pure, multi, etc.
+    - save_middle determines whether to save intermediate recognition results (sentence languages and lyrics) to save.langs, save.lyrics
     """
     data_num = len(dataset)
     dataset = dup_remove(dataset, save_path, 'path', 'lang')

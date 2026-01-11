@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Mulan-T评测: 计算音频与文本prompt的相似度
-用法: python eval_mulan_t.py --input_dir <音频目录> --prompts <prompt文件> --model_name <模型名> --output <输出文件>
-输出: 汇总结果 + _details.jsonl 详细结果
+Mulan-T Evaluation: Calculate similarity between audio and text prompts
+Usage: python eval_mulan_t.py --input_dir <audio_directory> --prompts <prompt_file> --model_name <model_name> --output <output_file>
+Output: Summary results + _details.jsonl detailed results
 """
 import argparse, json, os, re, sys, glob
 import librosa, torch
@@ -63,7 +63,7 @@ def main():
     with open(args.output, 'w') as f:
         json.dump({"model": args.model_name, "metrics": {"Mulan-T": avg}, "count": len(scores)}, f, indent=2)
     
-    # 保存详细结果
+    # Save detailed results
     details_file = args.output.replace('.json', '_details.jsonl')
     with open(details_file, 'w', encoding='utf-8') as f:
         for d in details:

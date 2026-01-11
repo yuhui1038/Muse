@@ -7,7 +7,7 @@ from pydub import AudioSegment
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 def _frame_generator(frame_duration_ms, audio, sample_rate):
-    """音频分帧"""
+    """Split audio into frames"""
     bytes_per_sample = 2
     frame_size = int(sample_rate * frame_duration_ms / 1000.0) * bytes_per_sample
     offset = 0
@@ -19,7 +19,7 @@ def _frame_generator(frame_duration_ms, audio, sample_rate):
         offset += frame_size
 
 def _vad_collector(sample_rate, frame_duration_ms, padding_duration_ms, vad, frames):
-    """根据webrtcvad合并连续的人声段"""
+    """Merge continuous vocal segments based on webrtcvad"""
     num_padding_frames = int(padding_duration_ms / frame_duration_ms)
     ring_buffer = collections.deque(maxlen=num_padding_frames)
 
@@ -45,7 +45,7 @@ def _vad_collector(sample_rate, frame_duration_ms, padding_duration_ms, vad, fra
                 triggered = False
                 ring_buffer.clear()
 
-    # 如果最后还在说话状态，则闭合最后一个段
+    # If still in speech state at the end, close the last segment
     if triggered:
         end_time = timestamp + (frame_duration_ms / 1000.0)
         speech_segments.append((start_time, end_time))
@@ -53,23 +53,23 @@ def _vad_collector(sample_rate, frame_duration_ms, padding_duration_ms, vad, fra
     return speech_segments
 
 def _one_process(path):
-    """检测一段音频中的人声段"""
-    # 1. 压缩音频
+    """Detect vocal segments in an audio"""
+    # 1. Compress audio
     audio = AudioSegment.from_file(path)
     audio = audio.set_frame_rate(16000).set_channels(1).set_sample_width(2)
     sample_rate = audio.frame_rate
     audio_data = audio.raw_data
 
-    # 2. 初始化VAD(0-3, 越大越容易被当作人声)
+    # 2. Initialize VAD (0-3, higher value means more likely to be considered as speech)
     vad = webrtcvad.Vad(0)
 
-    # 3. 生成帧
+    # 3. Generate frames
     frames = list(_frame_generator(30, audio_data, sample_rate))
 
-    # 4. 检测人声区间
+    # 4. Detect vocal intervals
     segments = _vad_collector(sample_rate, 30, 300, vad, frames)
 
-    # 如果没有人声则将start和end均置为-1
+    # If no vocals, set both start and end to -1
     if len(segments) == 0:
         return {
             "start": -1,
@@ -83,15 +83,15 @@ def _one_process(path):
         "segments": segments,
     }
 
-# ===== 对外接口 =====
+# ===== External Interface =====
 
 def get_endpoints_meta(dataset:list[dict], save_path:str, max_workers:int=4, save_middle:bool=True):
     """
-    为数据集中的每段音频添加端点标签(主要针对已分轨的人声音频)
-    - 要求dataset中每条数据路径字段为'path'
-    - 写入字段为endpoints.start/end
-    - 实时写入save_path中
-    - save_middle决定是否将每句的端点记录到save.segments字段
+    Add endpoint labels to each audio in dataset (mainly for separated vocal audio)
+    - Requires 'path' field in each data entry in dataset
+    - Write fields: endpoints.start/end
+    - Write to save_path in real-time
+    - save_middle determines whether to record each sentence's endpoints to save.segments field
     """
     dataset = dup_remove(dataset, save_path, 'path', 'endpoints')
     new_dataset = []
@@ -99,7 +99,7 @@ def get_endpoints_meta(dataset:list[dict], save_path:str, max_workers:int=4, sav
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             futures = {executor.submit(_one_process, ele['path']): ele for ele in dataset}
             for future in tqdm(as_completed(futures), desc="Detecting endpoints"):
-                ele = futures[future]   # 获取原始元素
+                ele = futures[future]   # Get original element
                 try:
                     result = future.result()
                     ele['endpoints'] = {

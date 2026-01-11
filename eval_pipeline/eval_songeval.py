@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-SongEval评测: 评测音频质量5个维度
-用法: python eval_songeval.py --input_dir <音频目录> --model_name <模型名> --output <输出文件>
-输出: 汇总结果 + _details.jsonl 详细结果
+SongEval Evaluation: Evaluate audio quality in 5 dimensions
+Usage: python eval_songeval.py --input_dir <audio_directory> --model_name <model_name> --output <output_file>
+Output: Summary results + _details.jsonl detailed results
 """
 import argparse, json, os, sys, glob, re
 import librosa, torch
@@ -34,13 +34,13 @@ def main():
 
     device = f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu"
     
-    # 加载模型
+    # Load model
     config = OmegaConf.load(args.config)
     model = instantiate(config.generator).to(device).eval()
     model.load_state_dict(load_file(args.ckpt, device="cpu"), strict=False)
     muq = MuQ.from_pretrained(args.muq).to(device).eval()
     
-    # 评测
+    # Evaluate
     files = sorted(glob.glob(f"{args.input_dir}/*.wav") + glob.glob(f"{args.input_dir}/*.mp3"))
     scores_all = {m: [] for m in METRICS}
     details = []
@@ -69,13 +69,13 @@ def main():
             print(f"Error {f}: {e}")
         torch.cuda.empty_cache()
     
-    # 保存汇总
+    # Save summary
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
     avg = {m: sum(v)/len(v) if v else 0 for m, v in scores_all.items()}
     with open(args.output, 'w') as f:
         json.dump({"model": args.model_name, "metrics": avg, "count": len(files)}, f, indent=2)
     
-    # 保存详细结果
+    # Save detailed results
     details_file = args.output.replace('.json', '_details.jsonl')
     with open(details_file, 'w', encoding='utf-8') as f:
         for d in details:

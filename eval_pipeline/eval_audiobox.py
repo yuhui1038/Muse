@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Audiobox评测: 评测音频美学分数
-用法: python eval_audiobox.py --input_dir <音频目录> --model_name <模型名> --output <输出文件>
-输出: 汇总结果 + _details.jsonl 详细结果
-需在sao环境运行
+Audiobox Evaluation: Evaluate audio aesthetic scores
+Usage: python eval_audiobox.py --input_dir <audio_directory> --model_name <model_name> --output <output_file>
+Output: Summary results + _details.jsonl detailed results
+Requires sao environment
 """
 import argparse, json, os, glob, subprocess, tempfile, re
 
@@ -20,16 +20,16 @@ def main():
     parser.add_argument("--batch_size", type=int, default=4)
     args = parser.parse_args()
     
-    # 收集文件
+    # Collect files
     files = sorted(glob.glob(f"{args.input_dir}/*.wav") + glob.glob(f"{args.input_dir}/*.mp3"))
     
-    # 写临时文件
+    # Write temporary file
     with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
         for p in files:
             f.write(json.dumps({"path": os.path.abspath(p)}) + '\n')
         paths_file = f.name
     
-    # 运行audio-aes
+    # Run audio-aes
     with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
         scores_file = f.name
     
@@ -40,23 +40,23 @@ def main():
     with open(scores_file, 'w') as out:
         subprocess.run(cmd, shell=True, stdout=out)
     
-    # 解析结果 - 按顺序匹配输入文件
+    # Parse results - match input files in order
     metrics = {"CE": [], "CU": [], "PC": [], "PQ": []}
     details = []
     
-    # 读取所有有效的评分行
+    # Read all valid score lines
     score_records = []
     with open(scores_file) as f:
         for line in f:
             if not line.strip(): continue
             try:
                 rec = json.loads(line)
-                # 检查是否包含评分字段
+                # Check if contains score fields
                 if all(k in rec for k in ["CE", "CU", "PC", "PQ"]):
                     score_records.append(rec)
             except: pass
     
-    # 按顺序匹配文件和评分
+    # Match files and scores in order
     for i, file_path in enumerate(files):
         if i >= len(score_records):
             break
@@ -81,7 +81,7 @@ def main():
             "scores": file_scores
         })
     
-    # 计算平均
+    # Calculate average
     avg = {k: sum(v)/len(v) if v else 0 for k, v in metrics.items()}
     avg["Score"] = sum(avg.values())
     
@@ -89,13 +89,13 @@ def main():
     with open(args.output, 'w') as f:
         json.dump({"model": args.model_name, "metrics": avg, "count": len(files)}, f, indent=2)
     
-    # 保存详细结果
+    # Save detailed results
     details_file = args.output.replace('.json', '_details.jsonl')
     with open(details_file, 'w', encoding='utf-8') as f:
         for d in details:
             f.write(json.dumps(d, ensure_ascii=False) + '\n')
     
-    # 清理
+    # Cleanup
     os.unlink(paths_file)
     os.unlink(scores_file)
     print(f"Saved: {args.output}")

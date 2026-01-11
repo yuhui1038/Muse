@@ -5,7 +5,7 @@ from my_tool import path_join, load_json
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 def _check_label(label:str, max_length:int=30) -> bool:
-    """检查标签是否合格(非空，非时间戳，非长歌词)"""
+    """Check if label is valid (non-empty, not timestamp, not long lyrics)"""
     length = len(label.strip())
     if length == 0:
         # print("Error Label: Empty")
@@ -14,13 +14,13 @@ def _check_label(label:str, max_length:int=30) -> bool:
         # print(f"Error Label: Words - {label}")
         return False
     if label.find(":") != -1 and label.find(".") != -1:
-        # 认为是时间戳
+        # Considered as timestamp
         # print(f"Error Label: Timestamp - {label}")
         return False
     return True
 
 def _convert_one(path:str):
-    """对一条歌曲元数据进行分段，剔除多余的内容"""
+    """Segment a song's metadata, remove redundant content"""
     data = load_json(path)
     dir = os.path.dirname(path)
     name = f"{data['song_id']}_{data['track_index']}.mp3"
@@ -30,7 +30,7 @@ def _convert_one(path:str):
         "song_id": data['song_id'],
         "segments": []
     }
-    words_info = data['timestamped_lyrics']['alignedWords']  # 逐句信息
+    words_info = data['timestamped_lyrics']['alignedWords']  # Sentence-by-sentence information
     seg_info = None
 
     empty_head = False
@@ -70,7 +70,7 @@ def _convert_one(path:str):
         pass
     return new_data
 
-# ===== 对外接口 =====
+# ===== External Interface =====
 
 def get_convert_segments(data_dir:str, save_path:str, max_workers:int=10):
     paths = []

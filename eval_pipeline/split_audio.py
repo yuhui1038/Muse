@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-拆分音频: 将100首歌拆分为中英文两个目录
-用法: python split_audio.py <输入目录> <输出目录>
-示例: python split_audio.py /path/to/audio /path/to/output
-      输入: 1-50 中文, 51-100 英文
-      输出: model_cn/ (重编号为 0-49), model_en/ (重编号为 0-49)
-      输出编号与 GT file_index 对齐
+Split audio: Split 100 songs into Chinese and English directories
+Usage: python split_audio.py <input_directory> <output_directory>
+Example: python split_audio.py /path/to/audio /path/to/output
+      Input: 1-50 Chinese, 51-100 English
+      Output: model_cn/ (renumbered to 0-49), model_en/ (renumbered to 0-49)
+      Output numbering aligns with GT file_index
 """
 import os, re, shutil, argparse
 from pathlib import Path
@@ -27,10 +27,10 @@ def split(src, dst):
         if idx is None: continue
         
         if 1 <= idx <= 50:
-            # 重编号为 0-49 以匹配 GT 的 file_index
+            # Renumber to 0-49 to match GT file_index
             shutil.copy2(f, cn_dir / f"{idx-1:06d}{f.suffix}")
         elif 51 <= idx <= 100:
-            # 重编号为 0-49 以匹配 GT 的 file_index
+            # Renumber to 0-49 to match GT file_index
             shutil.copy2(f, en_dir / f"{idx-51:06d}{f.suffix}")
     
     print(f"Split {name} -> {cn_dir.name}, {en_dir.name}")
