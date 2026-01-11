@@ -8,7 +8,7 @@ This repository is the official repository for "Muse: Towards Reproducible Long-
 
 ## News and Updates
 
-* **2026.01.11 🔥**: We are excited to announce that all datasets and models are now fully open-sourced! 🎶 The complete training dataset (116k songs), pretrained model weights, training and evaluation code, and data pipeline are publicly available on Hugging Face.
+* **2026.01.11 🔥**: We are excited to announce that all datasets and models are now fully open-sourced! 🎶 The complete training dataset (116k songs), pretrained model weights, training and evaluation code, and data pipeline are publicly available.
 
 ## Installation
 
