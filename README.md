@@ -22,18 +22,21 @@ To set up the environment for Muse:
   ```bash
   pip install vllm
   ```
-- **For audio encoding/decoding**: Some dependencies (e.g., `av`) require system-level packages. On Ubuntu/Debian, install them first:
+- **For audio encoding/decoding**: Some dependencies (e.g., `av`) require system-level packages. On Ubuntu/Debian, install FFmpeg 4.4+ first:
   ```bash
   sudo apt-get update
-  sudo apt-get install -y pkg-config libavformat-dev libavcodec-dev libavdevice-dev libavutil-dev libswscale-dev libswresample-dev libavfilter-dev
+  sudo apt-get install -y software-properties-common
+  sudo add-apt-repository ppa:savoury1/ffmpeg4 -y
+  sudo apt-get update
+  sudo apt-get install -y pkg-config ffmpeg libavformat-dev libavcodec-dev libavdevice-dev libavutil-dev libswscale-dev libswresample-dev libavfilter-dev
   ```
-  We recommend creating a new conda environment with Python 3.10. **Note**: Since `omegaconf==2.0.5` is required and has compatibility issues with pip 24.1+, you need to downgrade pip first:
+  We recommend creating a new conda environment with Python 3.10. **Note**: Since `omegaconf==2.0.6` is required and has compatibility issues with pip 24.1+, you need to downgrade pip first:
   ```bash
   pip install "pip<24.1"
   ```
   Then install dependencies:
   ```bash
-  pip install -r requirements_mucodec.txt
+  pip install --default-timeout=1000 -r requirements_mucodec.txt
   ```
   For more details, please refer to the [MuCodec](https://github.com/tencent-ailab/MuCodec) official repository.
 
