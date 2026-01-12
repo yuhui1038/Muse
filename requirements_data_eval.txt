@@ -1,0 +1,17 @@
+# Requirements for data pipeline and evaluation scripts
+# These are additional dependencies needed for data processing and evaluation
+
+# For lyrics generation
+openai
+
+# For lyrics filtering
+sentence-transformers
+
+# For metadata processing
+webrtcvad
+funasr
+qwen-omni-utils
+
+# For evaluation (Mulan-T, SongEval)
+muq
+

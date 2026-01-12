@@ -37,6 +37,11 @@ To set up the environment for Muse:
   ```
   For more details, please refer to the [MuCodec](https://github.com/tencent-ailab/MuCodec) official repository.
 
+- **For data pipeline and evaluation**: If you need to run data processing scripts (lyrics generation, metadata processing) or evaluation scripts, install additional dependencies:
+  ```bash
+  pip install -r requirements_data_eval.txt
+  ```
+
 ## Repository Structure
 
 This repository contains the following main directories:
