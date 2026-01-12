@@ -21,7 +21,11 @@ To set up the environment for Muse:
   sudo apt-get update
   sudo apt-get install -y pkg-config libavformat-dev libavcodec-dev libavdevice-dev libavutil-dev libswscale-dev libswresample-dev libavfilter-dev
   ```
-  We recommend creating a new conda environment and installing dependencies with `pip install -r requirements_mucodec.txt`. For more details, please refer to the [MuCodec](https://github.com/tencent-ailab/MuCodec) official repository.
+  We recommend creating a new conda environment with Python 3.10. **Note**: Since `omegaconf==2.0.5` is required and has compatibility issues with pip 24.1+, you need to downgrade pip first:
+  ```bash
+  pip install "pip<24.1"
+  ```
+  Then install dependencies with `pip install -r requirements_mucodec.txt`. For more details, please refer to the [MuCodec](https://github.com/tencent-ailab/MuCodec) official repository.
 
 ## Repository Structure
 
