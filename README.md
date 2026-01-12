@@ -14,8 +14,14 @@ This repository is the official repository for "Muse: Towards Reproducible Long-
 
 To set up the environment for Muse:
 
-- **For training**: Install the training framework with `pip install ms-swift -U`
-- **For inference**: Install vLLM with `pip install vllm`
+- **For training**: Install the training framework:
+  ```bash
+  pip install ms-swift -U
+  ```
+- **For inference**: Install vLLM:
+  ```bash
+  pip install vllm
+  ```
 - **For audio encoding/decoding**: Some dependencies (e.g., `av`) require system-level packages. On Ubuntu/Debian, install them first:
   ```bash
   sudo apt-get update
@@ -25,7 +31,11 @@ To set up the environment for Muse:
   ```bash
   pip install "pip<24.1"
   ```
-  Then install dependencies with `pip install -r requirements_mucodec.txt`. For more details, please refer to the [MuCodec](https://github.com/tencent-ailab/MuCodec) official repository.
+  Then install dependencies:
+  ```bash
+  pip install -r requirements_mucodec.txt
+  ```
+  For more details, please refer to the [MuCodec](https://github.com/tencent-ailab/MuCodec) official repository.
 
 ## Repository Structure
 
