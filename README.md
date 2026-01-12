@@ -12,6 +12,8 @@ This repository is the official repository for "Muse: Towards Reproducible Long-
 
 ## Installation
 
+**Requirements**: Python 3.10 is required.
+
 To set up the environment for Muse:
 
 - **For training**: Install the training framework:
