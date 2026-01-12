@@ -12,13 +12,16 @@ This repository is the official repository for "Muse: Towards Reproducible Long-
 
 ## Installation
 
-To set up the environment for Muse, you need to install the following dependencies:
+To set up the environment for Muse:
 
-1. **[Qwen3](https://github.com/QwenLM/Qwen3)**: Base language model framework
-2. **[ms-swift](https://github.com/modelscope/ms-swift)**: Training framework for fine-tuning
-3. **[MuCodec](https://github.com/tencent-ailab/MuCodec)**: Discrete audio tokenization codec
-
-Please refer to the respective repositories for detailed installation instructions. Make sure all dependencies are properly installed before running the training or inference scripts.
+- **For training**: Install the training framework with `pip install ms-swift -U`
+- **For inference**: Install vLLM with `pip install vllm`
+- **For audio encoding/decoding**: Some dependencies (e.g., `av`) require system-level packages. On Ubuntu/Debian, install them first:
+  ```bash
+  sudo apt-get update
+  sudo apt-get install -y pkg-config libavformat-dev libavcodec-dev libavdevice-dev libavutil-dev libswscale-dev libswresample-dev libavfilter-dev
+  ```
+  We recommend creating a new conda environment and installing dependencies with `pip install -r requirements_mucodec.txt`. For more details, please refer to the [MuCodec](https://github.com/tencent-ailab/MuCodec) official repository.
 
 ## Repository Structure
 
